@@ -1,5 +1,12 @@
 package extraction
 
+import play.api.libs.json.Json
+
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileWriter
+import java.io.IOException
+import java.nio.file.Paths
 import scala.annotation.tailrec
 
 object Main {
@@ -21,13 +28,12 @@ object Main {
       list match {
         case Nil => map
         case "--apk-filepath" :: value :: tail => nextArg(map ++ Map("apkFilePath" -> value), tail)
-        case "--aapt-exe-path" :: value :: tail => nextArg(map ++ Map("aaptPath" -> value), tail)
         case option => println(Console.RED + s"Unknown option: $option")
           sys.exit(1)
       }
     }
 
-    // make sure apk file name is given correctly
+    // make sure APK file name is given correctly
     var apkFilePath = ""
     nextArg(Map(), argList).get("apkFilePath") match {
       case Some(path) => apkFilePath = path
@@ -40,18 +46,30 @@ object Main {
       sys.exit(1)
     }
 
-    // open the apk file
+    // open the APK file
     (new OpenApk).openApkFile(apkFilePath)
 
     // extract the android version information
-    // TODO : find another way to use aapt.exe
-    var aaptPath = ""
-    nextArg(Map(), argList).get("aaptPath") match {
-      case Some(path) => aaptPath = path
-      case None => println(Console.RED + "aapt.exe path cannot be empty")
-                   sys.exit(1)
+    val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath)
+
+    // prepare the directory to write version.json in
+    val jsonPath = Paths.get(".").toAbsolutePath + "/src/files"
+    val directory = new File(jsonPath)
+    if (!directory.exists) {
+      directory.mkdirs()
     }
 
-    (new ExtractAndroidVersion).extractAndroidAPIVersion(apkFilePath, aaptPath)
+    // write the JSON value to version.json file
+    val file = new File(jsonPath + "/version.json")
+    try {
+      val bw = new BufferedWriter(new FileWriter(file))
+      bw.write(Json.prettyPrint(androidJSON))
+      bw.newLine()
+      bw.close()
+    } catch {
+      case e: IOException => println(Console.RED + e.getMessage)
+                             sys.exit(-1)
+    }
   }
+
 }
