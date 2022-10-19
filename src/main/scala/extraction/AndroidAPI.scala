@@ -41,7 +41,7 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
       createJson()
     } catch {
       case e: IOException => println(Console.RED + e.getMessage)
-                             null
+        null
     }
   }
 
@@ -68,9 +68,9 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
           for (buildToolsDir <- buildToolsDirs) {
             try {
               val aaptPath = buildToolsDir.toDirectory.deepFiles
-                             .filter(file => file.name.equals(fileName))
-                             .map(_.path)
-                             .next()
+                .filter(file => file.name.equals(fileName))
+                .map(_.path)
+                .next()
               if (Files.exists(Paths.get(aaptPath))) {
                 // found unique file at DIR/Android
                 return aaptPath
@@ -130,9 +130,20 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
     val range = targetSdkVersion - minSdkVersion
 
     var versions = Json.obj()
-    for (i <- 0 to range) {
-      val links = getVersionVulnerability(minSdkVersion + i)
-      versions = versions + ((minSdkVersion + i).toString -> Json.toJson(links))
+    if (targetSdkVersion != -1 && minSdkVersion == -1) {
+      // only targetSdkVersion found
+      val links = getVersionVulnerability(targetSdkVersion)
+      versions = versions + (targetSdkVersion.toString -> Json.toJson(links))
+    } else if (targetSdkVersion == -1 && minSdkVersion != -1) {
+      // only minSdkVersion found
+      val links = getVersionVulnerability(minSdkVersion)
+      versions = versions + (minSdkVersion.toString -> Json.toJson(links))
+    } else if (targetSdkVersion != -1 && minSdkVersion != -1) {
+      // both versions found
+      for (i <- 0 to range) {
+        val links = getVersionVulnerability(minSdkVersion + i)
+        versions = versions + ((minSdkVersion + i).toString -> Json.toJson(links))
+      }
     }
 
     Json.obj(
