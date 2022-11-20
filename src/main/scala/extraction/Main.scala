@@ -48,9 +48,16 @@ object Main {
 
     // open the APK file
     (new OpenApk).openApkFile(apkFilePath)
+    var folderPath = apkFilePath.substring(0, apkFilePath.length-4) // get rid of .apk
 
-    // extract the android version information
+    // extract the Android version information
     val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath)
+
+    // extract the Flutter version information
+    val flutterJSON = (new Flutter).extractFlutterVersion(folderPath)
+
+    // extract the React Native version information
+    val reactNativeJSON = (new ReactNative).extractReactNativeVersion(folderPath)
 
     // prepare the directory to write version.json in
     val jsonPath = Paths.get(".").toAbsolutePath + "/src/files"
@@ -63,7 +70,14 @@ object Main {
     val file = new File(jsonPath + "/version.json")
     try {
       val bw = new BufferedWriter(new FileWriter(file))
-      bw.write(Json.prettyPrint(androidJSON))
+
+      // write versions and vulnerabilities to a JSON file
+      var print = Json.obj(androidJSON)
+      if (flutterJSON != null) print += flutterJSON
+      if (reactNativeJSON != null) print += reactNativeJSON
+      print += "inherit" -> Json.toJson(true)
+
+      bw.write(Json.prettyPrint(print))
       bw.newLine()
       bw.close()
     } catch {

@@ -16,9 +16,9 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
    *
    * @param apkFilePath the APK file path
-   * @return the JSON value
+   * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String): JsValue = {
+  def extractAndroidAPIVersion(apkFilePath: String): (String, Json.JsValueWrapper) = {
     try {
       // get the aapt.exe path
       val aaptPath = findAaptPath("aapt.exe")
@@ -122,11 +122,11 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
   }
 
   /**
-   * Create a JSON value from this class' object
+   * Create a JSON from this class' object
    *
-   * @return the JSON value
+   * @return the mapping of the Android version
    */
-  def createJson(): JsValue = {
+  def createJson(): (String, Json.JsValueWrapper) = {
     val range = targetSdkVersion - minSdkVersion
 
     var versions = Json.obj()
@@ -146,14 +146,10 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
       }
     }
 
-    Json.obj(
-      "AndroidAPI" -> Json.obj("minSdkVersion" -> minSdkVersion,
-        "targetSdkVersion" -> targetSdkVersion,
-        "compileSdkVersion" -> compileSdkVersion,
-        "Vulnerabilities" -> versions
-      ),
-      "inherit" -> true
-    )
+    "AndroidAPI" -> Json.obj("minSdkVersion" -> minSdkVersion,
+      "targetSdkVersion" -> targetSdkVersion,
+      "compileSdkVersion" -> compileSdkVersion,
+      "Vulnerabilities" -> versions)
   }
 
   def getVersionVulnerability(version: Int): Array[String] = {

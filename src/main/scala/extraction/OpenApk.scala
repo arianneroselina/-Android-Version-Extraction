@@ -88,7 +88,11 @@ class OpenApk {
         Files.createDirectories(path)
       } else {
         Files.createDirectories(path.getParent)
-        Files.copy(zipFile.getInputStream(entry), path)
+        try {
+          Files.copy(zipFile.getInputStream(entry), path)
+        } catch {
+          case e: Exception => println(Console.RED + s"Failed to copy file $entry to $path")
+        }
       }
     }
   }
