@@ -48,26 +48,22 @@ object Main {
 
     // open the APK file
     (new OpenApk).openApkFile(apkFilePath)
-    var folderPath = apkFilePath.substring(0, apkFilePath.length-4) // get rid of .apk
+    val paths = apkFilePath.split(Array('\\', '/')) // get rid of .apk
+    val apkFileName = paths(paths.length - 1)
+    val fileName = apkFileName.substring(0, apkFileName.length - 4) // get rid of .apk
+    val folderPath = apkFilePath.substring(0, apkFilePath.length - apkFileName.length)
 
     // extract the Android version information
     val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath)
 
     // extract the Flutter version information
-    val flutterJSON = (new Flutter).extractFlutterVersion(folderPath)
+    val flutterJSON = (new Flutter).extractFlutterVersion(folderPath + fileName)
 
     // extract the React Native version information
-    val reactNativeJSON = (new ReactNative).extractReactNativeVersion(folderPath)
+    val reactNativeJSON = (new ReactNative).extractReactNativeVersion(folderPath + fileName)
 
-    // prepare the directory to write version.json in
-    val jsonPath = Paths.get(".").toAbsolutePath + "/src/files"
-    val directory = new File(jsonPath)
-    if (!directory.exists) {
-      directory.mkdirs()
-    }
-
-    // write the JSON value to version.json file
-    val file = new File(jsonPath + "/version.json")
+    // write the JSON value to JSON file
+    val file = new File(folderPath + fileName + ".json")
     try {
       val bw = new BufferedWriter(new FileWriter(file))
 
