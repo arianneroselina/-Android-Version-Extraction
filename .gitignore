@@ -1,4 +1,5 @@
 *.log
 *.class
+*.iml
 *.xml
 *.cache
