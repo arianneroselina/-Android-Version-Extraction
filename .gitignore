@@ -3,3 +3,9 @@
 *.iml
 *.xml
 *.cache
+/.bsp/
+/.idea/
+/null/
+/target/
+/venv/
+/project/target/
