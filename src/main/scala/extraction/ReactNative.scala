@@ -1,5 +1,6 @@
 package extraction
 
+import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import vulnerability.ReactNative.getVulnerabilities
 
@@ -10,13 +11,18 @@ import scala.util.control.Breaks.{break, breakable}
 
 class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
+  var logger: Option[Logger] = None
+
   /**
    * Extract the React Native version from the given APK, if React Native is used.
    *
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the React Native version
    */
-  def extractReactNativeVersion(folderPath: String): (String, JsValue) = {
+  def extractReactNativeVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+    this.logger = Some(logger)
+    logger.info("Starting React Native version extraction")
+
     try {
       // search for libreact*.so
       val fileName = """libreact.*.so"""
@@ -24,10 +30,10 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
       // no libreact*.so found
       if (filePaths == null || filePaths.isEmpty) {
-        println(Console.YELLOW + s"$fileName is not found in $folderPath lib directory")
+        logger.warn(s"$fileName is not found in $folderPath lib directory")
         return null
       }
-      println(Console.GREEN + "React Native implementation found")
+      logger.info("React Native implementation found")
 
       // check which lib is the returned libreact*.so in
       var libType = ""
@@ -51,12 +57,12 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         // extract the React Native version
         extractReactNativeVersion(reader, libType, fileName)
       }
-      println(Console.GREEN + "React Native version extraction finished")
+      logger.info("React Native version extraction finished")
 
       // return it as a JSON value
       createJson()
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.error(e.getMessage)
         null
     }
   }
@@ -127,7 +133,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         }
       }
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.get.error(e.getMessage)
     }
   }
 
@@ -150,6 +156,10 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         val links = getVersionVulnerability(reactNativeVersion(i))
         versions = versions + (reactNativeVersion(i) -> Json.toJson(links))
       }
+    } else {
+      val msg = "No React Native version found, perhaps too old or too new?"
+      logger.get.warn(msg)
+      writeVersion = msg
     }
 
     "React Native" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)

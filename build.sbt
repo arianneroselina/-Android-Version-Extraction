@@ -13,4 +13,6 @@ version := "0.1.0-SNAPSHOT"
 
 (ThisBuild / libraryDependencies) := List (
   "com.typesafe.play" %% "play-json" % "2.9.3",
-  "org.scala-lang" % "scala-reflect" % "2.13.8")
+  "org.scala-lang" % "scala-reflect" % "2.13.8",
+  "ch.qos.logback" % "logback-classic" % "1.2.10",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4")

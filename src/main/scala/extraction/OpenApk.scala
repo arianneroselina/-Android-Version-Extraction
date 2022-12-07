@@ -1,5 +1,7 @@
 package extraction
 
+import com.typesafe.scalalogging.Logger
+
 import java.nio.file._
 import scala.jdk.CollectionConverters.EnumerationHasAsScala
 import scala.util.Try
@@ -7,17 +9,20 @@ import java.util.zip.ZipFile
 
 class OpenApk {
 
+  var logger: Option[Logger] = None
   /**
    * Take care of opening the given APK file by converting it to zip and extracting it.
    *
    * @param apkFilePath the APK file path
    */
-  def openApkFile(apkFilePath: String): Unit = {
+  def openApkFile(apkFilePath: String, logger: Logger): Unit = {
+    this.logger = Some(logger)
+
     // copy file and rename it to have .zip file ending
     val zipFilePath = renameToZip(apkFilePath)
     val success = copyAndRenameFile(Paths.get(apkFilePath), Paths.get(zipFilePath))
     if (success == false) {
-      println(Console.RED + s"Failed to copy and rename APK file: $apkFilePath")
+      logger.error(s"Failed to copy and rename APK file: $apkFilePath")
       sys.exit(1)
     }
 
@@ -60,7 +65,7 @@ class OpenApk {
         val entries = Files.newDirectoryStream(path)
         entries.forEach(entry => deleteNonEmptyDirectory(entry))
       } catch {
-        case _: Exception => println(Console.RED + s"Failed to delete non empty directory: ${path.toString}")
+        case _: Exception => logger.get.error(s"Failed to delete non empty directory: ${path.toString}")
           sys.exit(1)
       }
     }
@@ -91,7 +96,7 @@ class OpenApk {
         try {
           Files.copy(zipFile.getInputStream(entry), path)
         } catch {
-          case e: Exception => println(Console.RED + s"Failed to copy file $entry to $path")
+          case e: Exception => logger.get.error(s"Failed to copy file $entry to $path")
         }
       }
     }

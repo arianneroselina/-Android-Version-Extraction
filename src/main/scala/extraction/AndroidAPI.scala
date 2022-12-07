@@ -1,5 +1,6 @@
 package extraction
 
+import com.typesafe.scalalogging.Logger
 import vulnerability.AndroidAPI.getVulnerabilities
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
@@ -12,18 +13,23 @@ import scala.util.control.Breaks.{break, breakable}
 
 class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, var compileSdkVersion: Int = -1) {
 
+  var logger: Option[Logger] = None
+
   /**
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
    *
    * @param apkFilePath the APK file path
    * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String): (String, Json.JsValueWrapper) = {
+  def extractAndroidAPIVersion(apkFilePath: String, logger: Logger): (String, Json.JsValueWrapper) = {
+    this.logger = Some(logger)
+    logger.info("Starting Android API version extraction")
+
     try {
       // get the aapt.exe path
       val aaptPath = findAaptPath("aapt.exe")
       if (aaptPath == null) {
-        println(Console.RED + s"aapt.exe command not found at path $aaptPath")
+        logger.error(s"aapt.exe command not found at path $aaptPath")
         sys.exit(1)
       }
 
@@ -40,7 +46,7 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
       // return it as a JSON value
       createJson()
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.error(e.getMessage)
         null
     }
   }
@@ -117,7 +123,7 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
         }
       }
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.get.error(e.getMessage)
     }
   }
 

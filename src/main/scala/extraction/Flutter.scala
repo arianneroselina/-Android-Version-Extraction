@@ -1,5 +1,6 @@
 package extraction
 
+import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import vulnerability.Flutter.getVulnerabilities
 
@@ -10,13 +11,18 @@ import scala.util.control.Breaks.{break, breakable}
 
 class Flutter(var flutterVersion: Array[String] = Array()) {
 
+  var logger: Option[Logger] = None
+
   /**
    * Extract the Flutter version from the given APK, if Flutter is used.
    *
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the Flutter version
    */
-  def extractFlutterVersion(folderPath: String): (String, JsValue) = {
+  def extractFlutterVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+    this.logger = Some(logger)
+    logger.info("Starting Flutter version extraction")
+
     try {
       // search for libflutter.so
       val fileName = "libflutter.so"
@@ -24,10 +30,10 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
 
       // no libflutter.so found
       if (filePath == null || filePath.isEmpty) {
-        println(Console.YELLOW + s"$fileName is not found in $folderPath lib directory")
+        logger.warn(s"$fileName is not found in $folderPath lib directory")
         return null
       }
-      println(Console.GREEN + "Flutter implementation found")
+      logger.info("Flutter implementation found")
 
       // check which lib is the returned libflutter.so in
       var libType = ""
@@ -45,12 +51,12 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
 
       // extract the Flutter version
       extractFlutterVersion(reader, libType)
-      println(Console.GREEN + "Flutter version extraction finished")
+      logger.info("Flutter version extraction finished")
 
       // return it as a JSON value
       createJson()
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.error(e.getMessage)
         null
     }
   }
@@ -113,7 +119,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
         }
       }
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage)
+      case e: IOException => logger.get.error(e.getMessage)
     }
   }
 
@@ -136,6 +142,10 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
         val links = getVersionVulnerability(flutterVersion(i))
         versions = versions + (flutterVersion(i) -> Json.toJson(links))
       }
+    } else {
+      val msg = "No Flutter version found, perhaps too old or too new?"
+      logger.get.warn(msg)
+      writeVersion = msg
     }
 
     "Flutter" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
