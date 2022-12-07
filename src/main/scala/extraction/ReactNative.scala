@@ -108,6 +108,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
    *
    * @param reader the buffered reader of the output from certutil execution
    * @param libType the lib directory type arm64-v8a, armeabi-v7a, x86, or x86_64
+   * @param fileName the filename
    */
   def extractReactNativeVersion(reader: BufferedReader, libType: String, fileName: String): Unit = {
     try {
