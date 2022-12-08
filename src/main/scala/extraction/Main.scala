@@ -72,6 +72,9 @@ object Main {
     // extract the React Native version information
     val reactNativeJSON = (new ReactNative).extractReactNativeVersion(folderPath + fileName, logger)
 
+    // extract the Apache Cordova version information
+    val cordovaJSON = (new Cordova).extractCordovaVersion(folderPath + fileName, logger)
+
     // write the JSON value to JSON file
     logger.info("Writing output file")
     val file = new File(folderPath + fileName + ".json")
@@ -82,6 +85,7 @@ object Main {
       var print = Json.obj(androidJSON)
       if (flutterJSON != null) print += flutterJSON
       if (reactNativeJSON != null) print += reactNativeJSON
+      if (cordovaJSON != null) print += cordovaJSON
       print += "inherit" -> Json.toJson(true)
 
       bw.write(Json.prettyPrint(print))
