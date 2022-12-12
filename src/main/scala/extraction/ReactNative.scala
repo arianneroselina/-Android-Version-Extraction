@@ -4,6 +4,7 @@ import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import vulnerability.ReactNative.getVulnerabilities
 
+import scala.collection.immutable.HashMap
 import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.nio.file.{Files, Paths}
 import scala.reflect.io.Path._
@@ -42,6 +43,8 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
       else if (filePaths(0).contains("x86")) libType = "x86"
       else if (filePaths(0).contains("x86_64")) libType = "x86_64"
 
+      var versionWeight = new HashMap[String, Int]()
+
       // run certutil
       for (filePath <- filePaths) {
         val f = filePath.split(Array('\\', '/'))
@@ -54,9 +57,17 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         val stdout = process.getInputStream
         val reader = new BufferedReader(new InputStreamReader(stdout))
 
-        // extract the React Native version
-        extractReactNativeVersion(reader, libType, fileName)
+        // extract the (most likely) React Native version
+        versionWeight = extractReactNativeVersion(reader, libType, fileName, versionWeight)
       }
+
+      // find and filter versions by the maximum weight
+      val maxValue = versionWeight.maxBy(item => item._2)
+      val writeVersion = versionWeight.filter(item => item._2 == maxValue._2)
+      writeVersion.foreach(v => {
+        // only write the version if it has the maximum weight compared to the other versions
+        reactNativeVersion = reactNativeVersion :+ v._1
+      })
       logger.info("React Native version extraction finished")
 
       // return it as a JSON value
@@ -110,8 +121,10 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
    * @param libType the lib directory type arm64-v8a, armeabi-v7a, x86, or x86_64
    * @param fileName the filename
    */
-  def extractReactNativeVersion(reader: BufferedReader, libType: String, fileName: String): Unit = {
+  def extractReactNativeVersion(reader: BufferedReader, libType: String, fileName: String,
+                                versionWeight: HashMap[String, Int]): HashMap[String, Int] = {
     try {
+      var copiedVersionWeight = versionWeight
       var line = reader.readLine
       breakable {
         while (line != null) {
@@ -124,7 +137,9 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
             for (csvLine <- bufferedSource.getLines) {
               val cols = csvLine.split(',').map(_.trim)
               if (cols(1).equals(fileName) && cols(2).equals(fileHash) && !reactNativeVersion.contains(cols(0))) {
-                reactNativeVersion = reactNativeVersion :+ cols(0)
+                // add version's weight by one if hashes match
+                val value = if (copiedVersionWeight.contains(cols(0))) copiedVersionWeight(cols(0))+1 else 1
+                copiedVersionWeight += (cols(0) -> value)
               }
             }
             bufferedSource.close
@@ -133,8 +148,11 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
           line = reader.readLine
         }
       }
+
+      copiedVersionWeight
     } catch {
       case e: IOException => logger.get.error(e.getMessage)
+        versionWeight
     }
   }
 
