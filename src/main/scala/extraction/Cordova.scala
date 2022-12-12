@@ -30,7 +30,7 @@ class Cordova(var cordovaVersion: String = "") {
       val filePath = findFile(folderPath + "\\assets\\www", fileName)
 
       // cordova.js is not found
-      if (filePath.isEmpty) {
+      if (filePath == null || filePath.isEmpty) {
         logger.warn(s"$fileName is not found in $folderPath directory")
         return null
       }
