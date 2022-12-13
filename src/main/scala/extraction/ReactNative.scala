@@ -2,13 +2,13 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
+import tools.Util.findFilesInLib
 import vulnerability.ReactNative.getVulnerabilities
 
 import scala.collection.immutable.HashMap
 import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.nio.file.{Files, Paths}
-import scala.reflect.io.Path._
-import scala.util.control.Breaks.{break, breakable}
+import java.nio.file.Paths
+import scala.util.control.Breaks.breakable
 
 class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
@@ -27,7 +27,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
     try {
       // search for libreact*.so
       val fileName = """libreact.*.so"""
-      val filePaths = findInLib(folderPath, fileName)
+      val filePaths = findFilesInLib(folderPath, fileName)
 
       // no libreact*.so found
       if (filePaths == null || filePaths.isEmpty) {
@@ -76,42 +76,6 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
       case e: IOException => logger.error(e.getMessage)
         null
     }
-  }
-
-  /**
-   * Find the path of the given file in lib directory.
-   *
-   * @param folderPath the path to the extracted APK folder
-   * @param fileName the filename in regex (e.g. libreact*,so)
-   * @return the path
-   */
-  def findInLib(folderPath: String, fileName: String): Array[String] = {
-    val libDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
-    for (libDir <- libDirs) {
-      val inLibs = libDir.toDirectory.dirs.map(_.path)
-      for (lib <- inLibs) {
-        try {
-          val filePaths = lib.toDirectory.files
-            .filter(file => file.name matches fileName)
-            .map(_.path)
-          val pathArray = filePaths.toArray
-
-          var found = true
-          for (filePath <- filePaths) {
-            if (!Files.exists(Paths.get(filePath))) {
-              found = false
-              break
-            }
-          }
-          if (found) {
-            return pathArray
-          }
-        } catch {
-          case _: Exception => // do nothing
-        }
-      }
-    }
-    null // file not found
   }
 
   /**

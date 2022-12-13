@@ -2,11 +2,10 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
+import tools.Util.findFile
 import vulnerability.Cordova.getVulnerabilities
 
 import java.io.IOException
-import java.nio.file.{Files, Paths}
-import scala.reflect.io.Path._
 import scala.util.control.Breaks.{break, breakable}
 import scala.io.Source
 
@@ -46,28 +45,6 @@ class Cordova(var cordovaVersion: String = "") {
       case e: IOException => logger.error(e.getMessage)
         null
     }
-  }
-
-  /**
-   * Find the path of the given file in the given folder.
-   *
-   * @param folderPath the path to the folder
-   * @param fileName the filename
-   * @return the path
-   */
-  def findFile(folderPath: String, fileName: String): String = {
-    try {
-      val filePath = folderPath.toDirectory.files
-        .filter(file => file.name.equals(fileName))
-        .map(_.path)
-        .next()
-      if (Files.exists(Paths.get(filePath))) {
-        return filePath
-      }
-    } catch {
-      case _: Exception => // do nothing
-    }
-    null // file not found
   }
 
   /**

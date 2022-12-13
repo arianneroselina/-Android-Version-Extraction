@@ -2,12 +2,12 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
+import tools.Util.findFileInLib
 import vulnerability.Flutter.getVulnerabilities
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.nio.file.{Files, Paths}
-import scala.reflect.io.Path._
-import scala.util.control.Breaks.{break, breakable}
+import java.nio.file.Paths
+import scala.util.control.Breaks.breakable
 
 class Flutter(var flutterVersion: Array[String] = Array()) {
 
@@ -26,7 +26,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
     try {
       // search for libflutter.so
       val fileName = "libflutter.so"
-      val filePath = findInLib(folderPath, fileName)
+      val filePath = findFileInLib(folderPath, fileName)
 
       // no libflutter.so found
       if (filePath == null || filePath.isEmpty) {
@@ -59,34 +59,6 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
       case e: IOException => logger.error(e.getMessage)
         null
     }
-  }
-
-  /**
-   * Find the path of the given file in lib directory.
-   *
-   * @param folderPath the path to the extracted APK folder
-   * @param fileName the filename (e.g. libflutter,so)
-   * @return the path
-   */
-  def findInLib(folderPath: String, fileName: String): String = {
-    val libDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
-    for (libDir <- libDirs) {
-      val inLibs = libDir.toDirectory.dirs.map(_.path)
-      for (lib <- inLibs) {
-        try {
-          val filePath = lib.toDirectory.files
-            .filter(file => file.name.equals(fileName))
-            .map(_.path)
-            .next()
-          if (Files.exists(Paths.get(filePath))) {
-            return filePath
-          }
-        } catch {
-          case _: Exception => // do nothing
-        }
-      }
-    }
-    null // file not found
   }
 
   /**
