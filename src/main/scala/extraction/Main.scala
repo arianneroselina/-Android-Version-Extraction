@@ -7,7 +7,6 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
-import java.nio.file.Paths
 import scala.annotation.tailrec
 
 object Main {
@@ -75,6 +74,9 @@ object Main {
     // extract the Apache Cordova version information
     val cordovaJSON = (new Cordova).extractCordovaVersion(folderPath + fileName, logger)
 
+    // extract the Unity version information
+    val unityJSON = (new Unity).extractUnityVersion(folderPath + fileName, logger)
+
     // write the JSON value to JSON file
     logger.info("Writing output file")
     val file = new File(folderPath + fileName + ".json")
@@ -86,6 +88,7 @@ object Main {
       if (flutterJSON != null) print += flutterJSON
       if (reactNativeJSON != null) print += reactNativeJSON
       if (cordovaJSON != null) print += cordovaJSON
+      if (unityJSON != null) print += unityJSON
       print += "inherit" -> Json.toJson(true)
 
       bw.write(Json.prettyPrint(print))
