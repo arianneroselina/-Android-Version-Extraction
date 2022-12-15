@@ -54,6 +54,7 @@ object Main {
       sys.exit(1)
     }
     logger.info("Got the .apk file " + apkFilePath)
+    logger.warn("Make sure that filename does not end with another extension, e.g. \".com.apk\", \".lib.apk\", etc.")
 
     // open the APK file
     (new OpenApk).openApkFile(apkFilePath, logger)
@@ -77,6 +78,9 @@ object Main {
     // extract the Unity version information
     val unityJSON = (new Unity).extractUnityVersion(folderPath + fileName, logger)
 
+    // extract the Xamarin version information
+    val xamarinJSON = (new Xamarin).extractXamarinVersion(folderPath + fileName, logger)
+
     // write the JSON value to JSON file
     logger.info("Writing output file")
     val file = new File(folderPath + fileName + ".json")
@@ -89,6 +93,7 @@ object Main {
       if (reactNativeJSON != null) print += reactNativeJSON
       if (cordovaJSON != null) print += cordovaJSON
       if (unityJSON != null) print += unityJSON
+      if (xamarinJSON != null) print += xamarinJSON
       print += "inherit" -> Json.toJson(true)
 
       bw.write(Json.prettyPrint(print))
