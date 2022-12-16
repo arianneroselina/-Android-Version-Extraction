@@ -2,11 +2,12 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
-import tools.Util.findFileInLib
+import tools.Util.{findFileInAssemblies, findFileInLib}
 import vulnerability.Xamarin.getVulnerabilities
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.nio.file.Paths
+import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.breakable
 
 class Xamarin(var xamarinVersion: Array[String] = Array()) {
@@ -25,31 +26,46 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
 
     try {
       // search for libxa-internal-api.so
-      val fileName = "libxa-internal-api.so"
-      val filePath = findFileInLib(folderPath, fileName)
+      val soFileName = "libxa-internal-api.so"
+      val soFilePath = findFileInLib(folderPath, soFileName)
 
-      // no libxa-internal-api.so found
-      if (filePath == null || filePath.isEmpty) {
-        logger.warn(s"$fileName is not found in $folderPath lib directory")
+      // search for Java.Interop.dll
+      val dllFileName = "Java.Interop.dll"
+      val dllFilePath = findFileInAssemblies(folderPath, dllFileName)
+
+      // Both files are not found
+      if ((soFilePath == null || soFilePath.isEmpty) && (dllFilePath == null || dllFilePath.isEmpty)) {
+        logger.warn(s"Neither $soFileName nor $dllFileName is found in $folderPath lib and assemblies directory")
         return null
       }
       logger.info("Xamarin implementation found")
 
-      // check which lib is the returned libxa-internal-api.so in
-      var libType = ""
-      if (filePath.contains("arm64-v8a")) libType = "arm64-v8a"
-      else if (filePath.contains("armeabi-v7a")) libType = "armeabi-v7a"
+      // check if both or only one are/is found
+      val paths = ArrayBuffer[String]()
+      val types = ArrayBuffer[String]()
+      if (soFilePath != null && soFilePath.nonEmpty) {
+        paths += soFilePath
+        if (soFilePath.contains("arm64-v8a")) types += "arm64-v8a"
+        else if (soFilePath.contains("armeabi-v7a")) types += "armeabi-v7a"
+      }
+      if (dllFilePath != null && dllFilePath.nonEmpty){
+        paths += dllFilePath
+        types += "assemblies"
+      }
 
       // run certutil
-      val processBuilder = new ProcessBuilder("certutil", "-hashfile", filePath, "SHA256")
-      val process = processBuilder.start
+      val bufferedReaders = new Array[BufferedReader](paths.length)
+      for (i <- paths.indices) {
+        val processBuilder = new ProcessBuilder("certutil", "-hashfile", paths(i), "SHA256")
+        val process = processBuilder.start
 
-      // prepare to read the output
-      val stdout = process.getInputStream
-      val reader = new BufferedReader(new InputStreamReader(stdout))
+        // prepare to read the output
+        val stdout = process.getInputStream
+          bufferedReaders(i) = new BufferedReader(new InputStreamReader(stdout))
+      }
 
       // extract the Xamarin version
-      extractXamarinVersion(reader, libType)
+      extractXamarinVersion(bufferedReaders, types)
       logger.info("Xamarin version extraction finished")
 
       // return it as a JSON value
@@ -63,30 +79,33 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
   /**
    * Extract the Xamarin version from a buffered reader
    *
-   * @param reader the buffered reader of the output from certutil execution
-   * @param libType the lib directory type arm64-v8a or armeabi-v7a
+   * @param readers the buffered reader(s) of the output from certutil execution(s)
+   * @param types the lib directory type arm64-v8a or armeabi-v7a for libxa-internal-api.so
+   *              and/or assemblies for Java.Interop.dll
    */
-  def extractXamarinVersion(reader: BufferedReader, libType: String): Unit = {
+  def extractXamarinVersion(readers: Array[BufferedReader], types: ArrayBuffer[String]): Unit = {
     try {
-      var line = reader.readLine
-      breakable {
-        while (line != null) {
-          if (!line.contains("SHA256") && !line.contains("CertUtil")) {
-            val fileHash = line
+      for (i <- readers.indices) {
+        var line = readers(i).readLine
+        breakable {
+          while (line != null) {
+            if (!line.contains("SHA256") && !line.contains("CertUtil")) {
+              val fileHash = line
 
-            // check which version the hash belongs to
-            val bufferedSource = io.Source.fromFile(
-              Paths.get(".").toAbsolutePath + "/src/files/hashes/xamarin/" + libType + ".csv")
-            for (csvLine <- bufferedSource.getLines) {
-              val cols = csvLine.split(',').map(_.trim)
-              if (cols(1).equals(fileHash) && !xamarinVersion.contains(cols(0))) {
-                xamarinVersion = xamarinVersion :+ cols(0)
+              // check which version the hash belongs to
+              val bufferedSource = io.Source.fromFile(
+                Paths.get(".").toAbsolutePath + "/src/files/hashes/xamarin/" + types(i) + ".csv")
+              for (csvLine <- bufferedSource.getLines) {
+                val cols = csvLine.split(',').map(_.trim)
+                if (cols(1).equals(fileHash) && !xamarinVersion.contains(cols(0))) {
+                  xamarinVersion = xamarinVersion :+ cols(0)
+                }
               }
+              bufferedSource.close
             }
-            bufferedSource.close
-          }
 
-          line = reader.readLine
+            line = readers(i).readLine
+          }
         }
       }
     } catch {

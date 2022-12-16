@@ -31,7 +31,7 @@ object Util {
    * Find the path of the given file name in lib directory.
    *
    * @param folderPath the path to the extracted APK folder
-   * @param fileName   the filename (e.g. libflutter,so)
+   * @param fileName   the filename (e.g. libflutter.so)
    * @return the path
    */
   def findFileInLib(folderPath: String, fileName: String): String = {
@@ -50,6 +50,31 @@ object Util {
         } catch {
           case _: Exception => // do nothing
         }
+      }
+    }
+    null // file not found
+  }
+
+  /**
+   * Find the path of the given file name in assemblies directory.
+   *
+   * @param folderPath the path to the extracted APK folder
+   * @param fileName   the filename (e.g. Java.Interop.dll)
+   * @return the path
+   */
+  def findFileInAssemblies(folderPath: String, fileName: String): String = {
+    val assembliesDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*assemblies""")
+    for (assemblies <- assembliesDirs) {
+      try {
+        val filePath = assemblies.toDirectory.files
+          .filter(file => file.name.equals(fileName))
+          .map(_.path)
+          .next()
+        if (Files.exists(Paths.get(filePath))) {
+          return filePath
+        }
+      } catch {
+        case _: Exception => // do nothing
       }
     }
     null // file not found
