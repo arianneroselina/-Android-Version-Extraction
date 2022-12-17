@@ -81,6 +81,9 @@ object Main {
     // extract the Xamarin version information
     val xamarinJSON = (new Xamarin).extractXamarinVersion(folderPath + fileName, logger)
 
+    // extract the Qt version information
+    val qtJSON = (new Qt).extractQtVersion(folderPath + fileName, logger)
+
     // write the JSON value to JSON file
     logger.info("Writing output file")
     val file = new File(folderPath + fileName + ".json")
@@ -94,6 +97,7 @@ object Main {
       if (cordovaJSON != null) print += cordovaJSON
       if (unityJSON != null) print += unityJSON
       if (xamarinJSON != null) print += xamarinJSON
+      if (qtJSON != null) print += qtJSON
       print += "inherit" -> Json.toJson(true)
 
       bw.write(Json.prettyPrint(print))
