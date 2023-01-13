@@ -15,14 +15,14 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
   var logger: Option[Logger] = None
 
   /**
-   * Extract the Xamarin version from the given APK, if Xamarin is used.
+   * Extract the Xamarin.Android version from the given APK, if Xamarin is used.
    *
    * @param folderPath the path to the extracted APK folder
-   * @return the mapping of the Xamarin version
+   * @return the mapping of the Xamarin.Android version
    */
   def extractXamarinVersion(folderPath: String, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Xamarin version extraction")
+    logger.info("Starting Xamarin.Android version extraction")
 
     try {
       // search for libxa-internal-api.so
@@ -64,9 +64,9 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
           bufferedReaders(i) = new BufferedReader(new InputStreamReader(stdout))
       }
 
-      // extract the Xamarin version
+      // extract the Xamarin.Android version
       extractXamarinVersion(bufferedReaders, types)
-      logger.info("Xamarin version extraction finished")
+      logger.info("Xamarin.Android version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -77,7 +77,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
   }
 
   /**
-   * Extract the Xamarin version from a buffered reader
+   * Extract the Xamarin.Android version from a buffered reader
    *
    * @param readers the buffered reader(s) of the output from certutil execution(s)
    * @param types the lib directory type arm64-v8a or armeabi-v7a for libxa-internal-api.so
@@ -116,7 +116,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
   /**
    * Create a JSON from this class' object
    *
-   * @return the mapping of the Xamarin version
+   * @return the mapping of the Xamarin.Android version
    */
   def createJson(): (String, JsValue) = {
     var versions = Json.obj()
@@ -133,12 +133,12 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
         versions = versions + (xamarinVersion(i) -> Json.toJson(links))
       }
     } else {
-      val msg = "No Xamarin version found, perhaps too old or too new?"
+      val msg = "No Xamarin.Android version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Xamarin" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
+    "Xamarin.Android" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 
   def getVersionVulnerability(version: String): Array[String] = {

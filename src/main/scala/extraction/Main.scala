@@ -78,7 +78,7 @@ object Main {
     // extract the Unity version information
     val unityJSON = (new Unity).extractUnityVersion(folderPath + fileName, logger)
 
-    // extract the Xamarin version information
+    // extract the Xamarin.Android version information
     val xamarinJSON = (new Xamarin).extractXamarinVersion(folderPath + fileName, logger)
 
     // extract the Qt version information
