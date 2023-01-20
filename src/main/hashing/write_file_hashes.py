@@ -252,7 +252,7 @@ def compare_versions(version1: str, version2: str):
 if __name__ == '__main__':
     if len(sys.argv) != 4:
         raise Exception(f'Please specify the framework name, the version and the project path!'
-                        f'Expected 3 arguments, but was {len(sys.argv)}.\n'
+                        f'Expected 3 arguments, but was {len(sys.argv) - 1}.\n'
                         f'Make sure there are no spaces in the path.')
 
     path = add_slash_to_path(sys.argv[3])
