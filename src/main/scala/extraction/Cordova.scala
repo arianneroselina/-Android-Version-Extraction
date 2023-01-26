@@ -2,10 +2,11 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
-import tools.Util.findFile
+import tools.Constants.cordovaFile
 import vulnerability.Cordova.getVulnerabilities
 
 import java.io.IOException
+import java.nio.file.{Files, Path, Paths}
 import scala.util.control.Breaks.{break, breakable}
 import scala.io.Source
 
@@ -19,24 +20,18 @@ class Cordova(var cordovaVersion: String = "") {
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the Cordova version
    */
-  def extractCordovaVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+  def extractCordovaVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
     logger.info("Starting Cordova version extraction")
 
     try {
       // search for cordova.js
-      val fileName = """cordova.js"""
-      val filePath = findFile(folderPath + "\\assets\\www", fileName)
-
-      // cordova.js is not found
-      if (filePath == null || filePath.isEmpty) {
-        logger.warn(s"$fileName is not found in $folderPath directory")
-        return null
+      val filePath = Paths.get(folderPath + "/assets/www/" + cordovaFile)
+      if (Files.exists(filePath)) {
+        // extract the Cordova version
+        extractCordovaVersionFromFile(filePath)
       }
-      logger.info("Cordova implementation found")
 
-      // extract the Cordova version
-      extractCordovaVersion(filePath)
       logger.info("Cordova version extraction finished")
 
       // return it as a JSON value
@@ -52,10 +47,10 @@ class Cordova(var cordovaVersion: String = "") {
    *
    * @param filePath the file path
    */
-  def extractCordovaVersion(filePath: String): Unit = {
+  def extractCordovaVersionFromFile(filePath: Path): Unit = {
     try {
       val keyword = "PLATFORM_VERSION_BUILD_LABEL"
-      val source = Source.fromFile(filePath)
+      val source = Source.fromFile(filePath.toString)
       breakable {
         for (line <- source.getLines) {
           if (line.contains(keyword)) {

@@ -1,92 +1,129 @@
 package extraction
 
 import com.typesafe.scalalogging.Logger
-import play.api.libs.json.Json
+import org.apache.commons.cli.{DefaultParser, Options}
+import play.api.libs.json.{JsValue, Json}
 
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
-import scala.annotation.tailrec
+import java.nio.file.{FileSystems, Files, Path, Paths}
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 object Main {
-  val usage =
-    """
-    Usage: main --apk-filepath filepath
-    """
+
+  var apkFilePath = ""
+  var apkFilesDir = ""
+  val options = new Options()
+
+  options.addOption("f", "apk-filepath", true, "input file <apk file path>")
+  options.addOption("d", "apk-files-directory", true, "input files <apk files directory path>")
+  options.addOption("a", "android-general", false, "include general android vulnerability links")
 
   val logger: Logger = Logger("AndroidVersionExtraction")
 
   def main(args: Array[String]): Unit = {
-    logger.info("Starting android_version_extraction")
-    val startTime = System.nanoTime
+    val command = new DefaultParser()
 
-    if (args.length != 2) {
-      println(usage)
-      sys.exit(1)
-    }
+    try {
+      val commandline = command.parse(options, args)
 
-    // command line arguments parser
-    // from https://stackoverflow.com/questions/2315912/best-way-to-parse-command-line-parameters
-    val argList = args.toList
-    type ArgsMap = Map[String, String]
+      logger.info("Starting android_version_extraction")
+      val startTime = System.nanoTime
 
-    @tailrec
-    def nextArg(map: ArgsMap, list: List[String]): ArgsMap = {
-      list match {
-        case Nil => map
-        case "--apk-filepath" :: value :: tail => nextArg(map ++ Map("apkFilePath" -> value), tail)
-        case option => println(Console.RED + s"Unknown option: $option" + Console.WHITE)
-          sys.exit(1)
+      // exactly one of the options must be set
+      if (!((commandline.hasOption("f") && !commandline.hasOption("d"))
+        || (commandline.hasOption("d") && !commandline.hasOption("f")))) {
+        logger.error("Either filepath or directory must be specified!")
+        sys.exit(1)
       }
-    }
 
+      if (commandline.hasOption("f")) {
+        apkFilePath = commandline.getOptionValue("f")
+        androidAppVulnerabilityDetection(Paths.get(apkFilePath), commandline.hasOption("a"))
+      }
+      else if (commandline.hasOption("d")) {
+        apkFilesDir = commandline.getOptionValue("d")
+        val dir = FileSystems.getDefault.getPath("apkFilesDir")
+        Files.list(dir).iterator().asScala.foreach(file =>
+          androidAppVulnerabilityDetection(file, commandline.hasOption("a")))
+      }
+
+      logger.info("All done")
+
+      // benchmark
+      val duration = (System.nanoTime - startTime) / 1e9d
+      logger.info("Total Running Time: " + duration)
+      val mb = 1024 * 1024
+      val runtime = Runtime.getRuntime
+      logger.info("Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb + " mb")
+      //logger.info("** Free Memory:  " + runtime.freeMemory / mb)
+      //logger.info("** Total Memory: " + runtime.totalMemory / mb)
+      //logger.info("** Max Memory:   " + runtime.maxMemory / mb)
+    } catch {
+      case e: Throwable => import org.apache.commons.cli.HelpFormatter
+        logger.error(e.getMessage)
+        val formatter = new HelpFormatter()
+        formatter.printHelp("StringDecryption", options)
+    }
+  }
+
+  def androidAppVulnerabilityDetection(apkFilePath: Path, withAndroidGeneral: Boolean): Unit = {
     // make sure APK file name is given correctly
-    var apkFilePath = ""
-    nextArg(Map(), argList).get("apkFilePath") match {
-      case Some(path) => apkFilePath = path
-      case None => println(Console.RED + "APK file path cannot be empty" + Console.WHITE)
-                   sys.exit(1)
-    }
-
-    if (!apkFilePath.endsWith("apk")) {
-      println(Console.RED + s"APK file does not have .apk file ending: $apkFilePath" + Console.WHITE)
+    if (!apkFilePath.getFileName.toString.endsWith(".apk")) {
+      logger.error(s"APK file does not have .apk file ending: $apkFilePath")
+      logger.warn("Make sure that filename does not have blank spaces")
       sys.exit(1)
     }
     logger.info("Got the .apk file " + apkFilePath)
-    logger.warn("Make sure that filename does not end with another extension, e.g. \".com.apk\", \".lib.apk\", etc.")
 
     // open the APK file
-    (new OpenApk).openApkFile(apkFilePath, logger)
-    val paths = apkFilePath.split(Array('\\', '/')) // get rid of .apk
-    val apkFileName = paths(paths.length - 1)
-    val fileName = apkFileName.substring(0, apkFileName.length - 4) // get rid of .apk
-    val folderPath = apkFilePath.substring(0, apkFilePath.length - apkFileName.length)
+    val openedApk: OpenApk = new OpenApk
+    openedApk.openApkFile(apkFilePath, logger)
 
     // extract the Android version information
-    val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath, logger)
+    val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath.toString, withAndroidGeneral, logger)
 
     // extract the Flutter version information
-    val flutterJSON = (new Flutter).extractFlutterVersion(folderPath + fileName, logger)
+    var flutterJSON: (String, JsValue) = null
+    if (openedApk.flutterUsed) {
+      flutterJSON = (new Flutter).extractFlutterVersion(openedApk.outputDirPath, logger)
+    }
 
     // extract the React Native version information
-    val reactNativeJSON = (new ReactNative).extractReactNativeVersion(folderPath + fileName, logger)
+    var reactNativeJSON: (String, JsValue) = null
+    if (openedApk.reactNativeUsed) {
+      reactNativeJSON = (new ReactNative).extractReactNativeVersion(openedApk.outputDirPath, logger)
+    }
 
     // extract the Apache Cordova version information
-    val cordovaJSON = (new Cordova).extractCordovaVersion(folderPath + fileName, logger)
+    var cordovaJSON: (String, JsValue) = null
+    if (openedApk.cordovaUsed) {
+      cordovaJSON = (new Cordova).extractCordovaVersion(openedApk.outputDirPath, logger)
+    }
 
     // extract the Unity version information
-    val unityJSON = (new Unity).extractUnityVersion(folderPath + fileName, logger)
+    var unityJSON: (String, JsValue) = null
+    if (openedApk.unityUsed) {
+      unityJSON = (new Unity).extractUnityVersion(openedApk.outputDirPath, logger)
+    }
 
     // extract the Xamarin.Android version information
-    val xamarinJSON = (new Xamarin).extractXamarinVersion(folderPath + fileName, logger)
+    var xamarinJSON: (String, JsValue) = null
+    if (openedApk.xamarinUsed) {
+      xamarinJSON = (new Xamarin).extractXamarinVersion(openedApk.outputDirPath, logger)
+    }
 
     // extract the Qt version information
-    val qtJSON = (new Qt).extractQtVersion(folderPath + fileName, logger)
+    var qtJSON: (String, JsValue) = null
+    if (openedApk.qtUsed) {
+      qtJSON = (new Qt).extractQtVersion(openedApk.outputDirPath, logger)
+    }
 
     // write the JSON value to JSON file
     logger.info("Writing output file")
-    val file = new File(folderPath + fileName + ".json")
+    val file = new File(openedApk.outputDirPath + ".json")
     try {
       val bw = new BufferedWriter(new FileWriter(file))
 
@@ -104,20 +141,8 @@ object Main {
       bw.newLine()
       bw.close()
     } catch {
-      case e: IOException => println(Console.RED + e.getMessage + Console.WHITE)
-                             sys.exit(-1)
+      case e: IOException => logger.error(e.getMessage)
+        sys.exit(-1)
     }
-    logger.info("All done")
-
-    // benchmark
-    val duration = (System.nanoTime - startTime) / 1e9d
-    logger.info("Total Running Time: " + duration)
-    val mb = 1024 * 1024
-    val runtime = Runtime.getRuntime
-    logger.info("Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb + " mb")
-    //logger.info("** Free Memory:  " + runtime.freeMemory / mb)
-    //logger.info("** Total Memory: " + runtime.totalMemory / mb)
-    //logger.info("** Max Memory:   " + runtime.maxMemory / mb)
   }
-
 }

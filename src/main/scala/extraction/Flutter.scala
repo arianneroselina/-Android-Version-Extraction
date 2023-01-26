@@ -2,12 +2,13 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
-import tools.Util.findFileInLib
+import tools.Constants.{flutterFile, flutterFolders, soExtension}
+import tools.HexEditor.bytesToHex
 import vulnerability.Flutter.getVulnerabilities
 
-import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.nio.file.Paths
-import scala.util.control.Breaks.breakable
+import java.io.IOException
+import java.nio.file.{Files, Path, Paths}
+import java.security.MessageDigest
 
 class Flutter(var flutterVersion: Array[String] = Array()) {
 
@@ -19,38 +20,20 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the Flutter version
    */
-  def extractFlutterVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+  def extractFlutterVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
     logger.info("Starting Flutter version extraction")
 
     try {
       // search for libflutter.so
-      val fileName = "libflutter.so"
-      val filePath = findFileInLib(folderPath, fileName)
-
-      // no libflutter.so found
-      if (filePath == null || filePath.isEmpty) {
-        logger.warn(s"$fileName is not found in $folderPath lib directory")
-        return null
+      for (flutterFolder <- flutterFolders) {
+        val filePath = Paths.get(folderPath + "/lib/" + flutterFolder + "/" + flutterFile + soExtension)
+        if (Files.exists(filePath)) {
+          // extract the Flutter version
+          compareFlutterHashes(filePath, flutterFolder)
+        }
       }
-      logger.info("Flutter implementation found")
 
-      // check which lib is the returned libflutter.so in
-      var libType = ""
-      if (filePath.contains("arm64-v8a")) libType = "arm64-v8a"
-      else if (filePath.contains("armeabi-v7a")) libType = "armeabi-v7a"
-      else if (filePath.contains("x86_64")) libType = "x86_64"
-
-      // run certutil
-      val processBuilder = new ProcessBuilder("certutil", "-hashfile", filePath, "SHA256")
-      val process = processBuilder.start
-
-      // prepare to read the output
-      val stdout = process.getInputStream
-      val reader = new BufferedReader(new InputStreamReader(stdout))
-
-      // extract the Flutter version
-      extractFlutterVersion(reader, libType)
       logger.info("Flutter version extraction finished")
 
       // return it as a JSON value
@@ -64,32 +47,25 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
   /**
    * Extract the Flutter version from a buffered reader
    *
-   * @param reader the buffered reader of the output from certutil execution
+   * @param filePath the file path
    * @param libType the lib directory type arm64-v8a, armeabi-v7a, or x86_64
    */
-  def extractFlutterVersion(reader: BufferedReader, libType: String): Unit = {
+  def compareFlutterHashes(filePath: Path, libType: String): Unit = {
     try {
-      var line = reader.readLine
-      breakable {
-        while (line != null) {
-          if (!line.contains("SHA256") && !line.contains("CertUtil")) {
-            val fileHash = line
+      // hash the file
+      val b = Files.readAllBytes(filePath)
+      val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(b)).mkString("")
 
-            // check which version the hash belongs to
-            val bufferedSource = io.Source.fromFile(
-              Paths.get(".").toAbsolutePath + "/src/files/hashes/flutter/" + libType + ".csv")
-            for (csvLine <- bufferedSource.getLines) {
-              val cols = csvLine.split(',').map(_.trim)
-              if (cols(1).equals(fileHash) && !flutterVersion.contains(cols(0))) {
-                flutterVersion = flutterVersion :+ cols(0)
-              }
-            }
-            bufferedSource.close
-          }
-
-          line = reader.readLine
+      // check which version the hash belongs to
+      val bufferedSource = io.Source.fromFile(
+        Paths.get(".").toAbsolutePath + "/src/files/hashes/flutter/" + libType + ".csv")
+      for (csvLine <- bufferedSource.getLines) {
+        val cols = csvLine.split(',').map(_.trim)
+        if (cols(1).equals(hash) && !flutterVersion.contains(cols(0))) {
+          flutterVersion = flutterVersion :+ cols(0)
         }
       }
+      bufferedSource.close
     } catch {
       case e: IOException => logger.get.error(e.getMessage)
     }
@@ -106,7 +82,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
 
     if (flutterVersion.nonEmpty) {
       for (i <- 0 until flutterVersion.length) {
-        if (i == 0 ) {
+        if (i == 0) {
           writeVersion = flutterVersion(i)
         } else {
           writeVersion += ", " + flutterVersion(i)

@@ -2,13 +2,15 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
-import tools.Util.{findFileInAssemblies, findFileInLib}
+import tools.Constants.{dllExtension, soExtension, xamarinDllFile, xamarinSoFile, xamarinSoFolders}
+import tools.HexEditor.bytesToHex
+import tools.Util.findFileInAssemblies
 import vulnerability.Xamarin.getVulnerabilities
 
-import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.nio.file.Paths
+import java.io.IOException
+import java.nio.file.{Files, Path, Paths}
+import java.security.MessageDigest
 import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks.breakable
 
 class Xamarin(var xamarinVersion: Array[String] = Array()) {
 
@@ -20,52 +22,27 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the Xamarin.Android version
    */
-  def extractXamarinVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+  def extractXamarinVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
     logger.info("Starting Xamarin.Android version extraction")
 
     try {
       // search for libxa-internal-api.so
-      val soFileName = "libxa-internal-api.so"
-      val soFilePath = findFileInLib(folderPath, soFileName)
+      for (xamarinSoFolder <- xamarinSoFolders) {
+        val filePath = Paths.get(folderPath + "/lib/" + xamarinSoFolder + "/" + xamarinSoFile + soExtension)
+        if (Files.exists(filePath)) {
+          // extract the Xamarin version
+          compareXamarinHashes(filePath, xamarinSoFolder)
+        }
+      }
 
       // search for Java.Interop.dll
-      val dllFileName = "Java.Interop.dll"
-      val dllFilePath = findFileInAssemblies(folderPath, dllFileName)
-
-      // Both files are not found
-      if ((soFilePath == null || soFilePath.isEmpty) && (dllFilePath == null || dllFilePath.isEmpty)) {
-        logger.warn(s"Neither $soFileName nor $dllFileName is found in $folderPath lib and assemblies directory")
-        return null
-      }
-      logger.info("Xamarin implementation found")
-
-      // check if both or only one are/is found
-      val paths = ArrayBuffer[String]()
-      val types = ArrayBuffer[String]()
-      if (soFilePath != null && soFilePath.nonEmpty) {
-        paths += soFilePath
-        if (soFilePath.contains("arm64-v8a")) types += "arm64-v8a"
-        else if (soFilePath.contains("armeabi-v7a")) types += "armeabi-v7a"
-      }
-      if (dllFilePath != null && dllFilePath.nonEmpty){
-        paths += dllFilePath
-        types += "assemblies"
+     val filePath = Paths.get(folderPath + "/assemblies/" + xamarinDllFile + dllExtension)
+      if (Files.exists(filePath)) {
+        // extract the Xamarin version
+        compareXamarinHashes(filePath, "assemblies")
       }
 
-      // run certutil
-      val bufferedReaders = new Array[BufferedReader](paths.length)
-      for (i <- paths.indices) {
-        val processBuilder = new ProcessBuilder("certutil", "-hashfile", paths(i), "SHA256")
-        val process = processBuilder.start
-
-        // prepare to read the output
-        val stdout = process.getInputStream
-          bufferedReaders(i) = new BufferedReader(new InputStreamReader(stdout))
-      }
-
-      // extract the Xamarin.Android version
-      extractXamarinVersion(bufferedReaders, types)
       logger.info("Xamarin.Android version extraction finished")
 
       // return it as a JSON value
@@ -79,35 +56,26 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
   /**
    * Extract the Xamarin.Android version from a buffered reader
    *
-   * @param readers the buffered reader(s) of the output from certutil execution(s)
-   * @param types the lib directory type arm64-v8a or armeabi-v7a for libxa-internal-api.so
-   *              and/or assemblies for Java.Interop.dll
+   * @param filePath the file path
+   * @param libType  the lib directory type arm64-v8a or armeabi-v7a for libxa-internal-api.so
+   *                 and/or assemblies for Java.Interop.dll
    */
-  def extractXamarinVersion(readers: Array[BufferedReader], types: ArrayBuffer[String]): Unit = {
+  def compareXamarinHashes(filePath: Path, libType: String): Unit = {
     try {
-      for (i <- readers.indices) {
-        var line = readers(i).readLine
-        breakable {
-          while (line != null) {
-            if (!line.contains("SHA256") && !line.contains("CertUtil")) {
-              val fileHash = line
+      // hash the file
+        val b = Files.readAllBytes(filePath)
+        val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(b)).mkString("")
 
-              // check which version the hash belongs to
-              val bufferedSource = io.Source.fromFile(
-                Paths.get(".").toAbsolutePath + "/src/files/hashes/xamarin/" + types(i) + ".csv")
-              for (csvLine <- bufferedSource.getLines) {
-                val cols = csvLine.split(',').map(_.trim)
-                if (cols(1).equals(fileHash) && !xamarinVersion.contains(cols(0))) {
-                  xamarinVersion = xamarinVersion :+ cols(0)
-                }
-              }
-              bufferedSource.close
-            }
-
-            line = readers(i).readLine
+        // check which version the hash belongs to
+        val bufferedSource = io.Source.fromFile(
+          Paths.get(".").toAbsolutePath + "/src/files/hashes/xamarin/" + libType + ".csv")
+        for (csvLine <- bufferedSource.getLines) {
+          val cols = csvLine.split(',').map(_.trim)
+          if (cols(1).equals(hash) && !xamarinVersion.contains(cols(0))) {
+            xamarinVersion = xamarinVersion :+ cols(0)
           }
         }
-      }
+        bufferedSource.close
     } catch {
       case e: IOException => logger.get.error(e.getMessage)
     }
@@ -124,7 +92,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
 
     if (xamarinVersion.nonEmpty) {
       for (i <- 0 until xamarinVersion.length) {
-        if (i == 0 ) {
+        if (i == 0) {
           writeVersion = xamarinVersion(i)
         } else {
           writeVersion += ", " + xamarinVersion(i)

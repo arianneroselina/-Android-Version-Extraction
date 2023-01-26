@@ -14,15 +14,18 @@ import scala.util.control.Breaks.{break, breakable}
 class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, var compileSdkVersion: Int = -1) {
 
   var logger: Option[Logger] = None
+  var withAndroidGeneral = false
 
   /**
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
    *
    * @param apkFilePath the APK file path
+   * @param withAndroidGeneral true, if the vulnerabilities found generally in all versions should be included
    * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String, logger: Logger): (String, Json.JsValueWrapper) = {
+  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean, logger: Logger): (String, Json.JsValueWrapper) = {
     this.logger = Some(logger)
+    this.withAndroidGeneral = withAndroidGeneral
     logger.info("Starting Android API version extraction")
 
     try {
@@ -159,6 +162,6 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
   }
 
   def getVersionVulnerability(version: Int): Array[String] = {
-    getVulnerabilities(version)
+    getVulnerabilities(version, withAndroidGeneral)
   }
 }

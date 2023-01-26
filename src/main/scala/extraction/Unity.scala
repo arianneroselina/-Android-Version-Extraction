@@ -2,11 +2,12 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
+import tools.Constants.unityFile
 import tools.HexEditor.{openHexFile, toAscii}
-import tools.Util.findFile
 import vulnerability.Unity.getVulnerabilities
 
 import java.io.IOException
+import java.nio.file.{Files, Path, Paths}
 
 class Unity(var unityVersion: String = "") {
 
@@ -18,24 +19,18 @@ class Unity(var unityVersion: String = "") {
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the Unity version
    */
-  def extractUnityVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+  def extractUnityVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
     logger.info("Starting Unity version extraction")
 
     try {
       // search for file 0000000000000000f000000000000000
-      val fileName = """0000000000000000f000000000000000"""
-      val filePath = findFile(folderPath + "\\assets\\bin\\Data", fileName)
-
-      // The file is not found
-      if (filePath == null || filePath.isEmpty) {
-        logger.warn(s"$fileName is not found in $folderPath directory")
-        return null
+      val filePath = Paths.get(folderPath + "/assets/bin/Data/" + unityFile)
+      if (Files.exists(filePath)) {
+        // extract the Unity version
+        extractUnityVersionFromFile(filePath)
       }
-      logger.info("Unity implementation found")
 
-      // extract the Unity version
-      extractUnityVersion(filePath)
       logger.info("Unity version extraction finished")
 
       // return it as a JSON value
@@ -51,9 +46,9 @@ class Unity(var unityVersion: String = "") {
    *
    * @param filePath the file path
    */
-  def extractUnityVersion(filePath: String): Unit = {
+  def extractUnityVersionFromFile(filePath: Path): Unit = {
     try {
-      val hexString = openHexFile(filePath)
+      val hexString = openHexFile(filePath.toString)
       unityVersion = toAscii(hexString.substring(40, 62))
     } catch {
       case e: Exception => logger.get.error(e.getMessage)

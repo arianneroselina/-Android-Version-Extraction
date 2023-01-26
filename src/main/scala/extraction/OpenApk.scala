@@ -1,62 +1,95 @@
 package extraction
 
 import com.typesafe.scalalogging.Logger
+import tools.Constants._
 
 import java.nio.file._
 import scala.jdk.CollectionConverters.EnumerationHasAsScala
-import scala.util.Try
-import java.util.zip.ZipFile
+import java.util.zip.{ZipEntry, ZipFile}
 
 class OpenApk {
 
   var logger: Option[Logger] = None
+  var outputDirPath: Path = null
+
+  var flutterUsed = false
+  var reactNativeUsed = false
+  var cordovaUsed = false
+  var qtUsed = false
+  var unityUsed = false
+  var xamarinUsed = false
+
   /**
    * Take care of opening the given APK file by converting it to zip and extracting it.
    *
    * @param apkFilePath the APK file path
    */
-  def openApkFile(apkFilePath: String, logger: Logger): Unit = {
+  def openApkFile(apkFilePath: Path, logger: Logger): Unit = {
     this.logger = Some(logger)
 
-    // copy file and rename it to have .zip file ending
-    val zipFilePath = renameToZip(apkFilePath)
-    val success = copyAndRenameFile(Paths.get(apkFilePath), Paths.get(zipFilePath))
-    if (success == false) {
-      logger.error(s"Failed to copy and rename APK file: $apkFilePath")
-      sys.exit(1)
+    outputDirPath = Paths.get(apkFilePath.toString.replaceFirst("[.][^.]+$", ""))
+
+    // delete directory if exists
+    if (Files.exists(outputDirPath))
+      deleteNonEmptyDirectory(outputDirPath)
+
+    val zipFile = new ZipFile(apkFilePath.toFile)
+    for (entry <- zipFile.entries.asScala) {
+      // extract Flutter, React Native, Qt, and Xamarin so files
+      if (entry.getName.contains(flutterFile + soExtension)) {
+        if (!flutterUsed) {
+          flutterUsed = true
+          logger.info("Flutter implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+      if (entry.getName.matches(""".*""" + reactNativeFile + soExtension)) {
+        if (!reactNativeUsed) {
+          reactNativeUsed = true
+          logger.info("React Native implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+      if (entry.getName.matches(""".*""" + qtFile + soExtension)) {
+        if (!qtUsed) {
+          qtUsed = true
+          logger.info("Qt implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+      if (entry.getName.contains(xamarinSoFile + soExtension)) {
+        if (!xamarinUsed) {
+          xamarinUsed = true
+          logger.info("Xamarin implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+
+      // extract Xamarin dll file
+      if (entry.getName.contains("assemblies/" + xamarinDllFile + dllExtension)) {
+        if (!xamarinUsed) {
+          xamarinUsed = true
+          logger.info("Xamarin implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+      // extract Unity file
+      if (entry.getName.contains("assets/bin/Data/" + unityFile)) {
+        if (!unityUsed) {
+          unityUsed = true
+          logger.info("Unity implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
+      // extract Cordova file
+      if (entry.getName.contains("assets/www/" + cordovaFile)) {
+        if (!cordovaUsed) {
+          cordovaUsed = true
+          logger.info("Cordova implementation found")
+        }
+        createDirOrFile(outputDirPath, zipFile, entry)
+      }
     }
-
-    // get folder delimiter index (if any)
-    var i = zipFilePath.lastIndexOf("/")
-    if (i < 0) {
-      i = zipFilePath.lastIndexOf("""\""")
-    }
-
-    var fileName = zipFilePath
-    if (i > 0) {
-      // split the file's path and name
-      val filePath = zipFilePath.substring(0, i + 1)
-      fileName = zipFilePath.substring(i + 1)
-      extractZip(filePath, fileName)
-    } else {
-      // only file name is given, it means file is in the same directory as main.scala
-      extractZip("", fileName)
-    }
-  }
-
-  def renameToZip(path: String): String = {
-    path.replace("apk", "zip")
-  }
-
-  /**
-   * Copies and renames the given .apk file as .zip.
-   *
-   * @param src  the original file path
-   * @param dest the new file path
-   * @return true if it succeeds, false otherwise
-   */
-  def copyAndRenameFile(src: Path, dest: Path): Any = {
-    Try(Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING)).getOrElse(false)
   }
 
   def deleteNonEmptyDirectory(path: Path): Unit = {
@@ -73,31 +106,22 @@ class OpenApk {
   }
 
   /**
-   * Extract the zip with the name fileName at the given path.
+   * Create the directory or file for zip file extraction
    *
-   * @param path     the path of the file
-   * @param fileName the zip file name
+   * @param outputFilePath the output path
+   * @param apkFile        the apk file
+   * @param entry          the zip entry to be created
    */
-  def extractZip(path: String, fileName: String): Unit = {
-    val inputFilePath = Paths.get(path + fileName)
-    val outputFilePath = Paths.get(path + fileName.substring(0, fileName.length - 4))
-
-    // delete directory if exists
-    if (Files.exists(outputFilePath))
-      deleteNonEmptyDirectory(outputFilePath)
-
-    val zipFile = new ZipFile(inputFilePath.toFile)
-    for (entry <- zipFile.entries.asScala) {
-      val path = outputFilePath.resolve(entry.getName)
-      if (entry.isDirectory) {
-        Files.createDirectories(path)
-      } else {
-        Files.createDirectories(path.getParent)
-        try {
-          Files.copy(zipFile.getInputStream(entry), path)
-        } catch {
-          case e: Exception => logger.get.error(s"Failed to copy file $entry to $path")
-        }
+  def createDirOrFile(outputFilePath: Path, apkFile: ZipFile, entry: ZipEntry): Unit = {
+    val path = outputFilePath.resolve(entry.getName)
+    if (entry.isDirectory) {
+      Files.createDirectories(path)
+    } else {
+      Files.createDirectories(path.getParent)
+      try {
+        Files.copy(apkFile.getInputStream(entry), path)
+      } catch {
+        case _: Exception => logger.get.error(s"Failed to copy file $entry to $path")
       }
     }
   }

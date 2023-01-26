@@ -1,6 +1,6 @@
 package tools
 
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 import scala.reflect.io.Path._
 import scala.util.control.Breaks.break
 
@@ -12,9 +12,9 @@ object Util {
    * @param fileName   the filename
    * @return the path
    */
-  def findFile(folderPath: String, fileName: String): String = {
+  def findFile(folderPath: Path, fileName: String): String = {
     try {
-      val filePath = folderPath.toDirectory.files
+      val filePath = folderPath.toFile.toDirectory.files
         .filter(file => file.name.equals(fileName))
         .map(_.path)
         .next()
@@ -34,8 +34,8 @@ object Util {
    * @param fileName   the filename (e.g. libflutter.so)
    * @return the path
    */
-  def findFileInLib(folderPath: String, fileName: String): String = {
-    val libDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
+  def findFileInLib(folderPath: Path, fileName: String): String = {
+    val libDirs = folderPath.toFile.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
     for (libDir <- libDirs) {
       val inLibs = libDir.toDirectory.dirs.map(_.path)
       for (lib <- inLibs) {
@@ -62,8 +62,8 @@ object Util {
    * @param fileName   the filename (e.g. Java.Interop.dll)
    * @return the path
    */
-  def findFileInAssemblies(folderPath: String, fileName: String): String = {
-    val assembliesDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*assemblies""")
+  def findFileInAssemblies(folderPath: Path, fileName: String): String = {
+    val assembliesDirs = folderPath.toFile.toDirectory.dirs.map(_.path).filter(name => name matches """.*assemblies""")
     for (assemblies <- assembliesDirs) {
       try {
         val filePath = assemblies.toDirectory.files
@@ -87,8 +87,8 @@ object Util {
    * @param fileName   the filename in regex (e.g. libreact*,so)
    * @return the paths
    */
-  def findFilesInLib(folderPath: String, fileName: String): Array[String] = {
-    val libDirs = folderPath.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
+  def findFilesInLib(folderPath: Path, fileName: String): Array[String] = {
+    val libDirs = folderPath.toFile.toDirectory.dirs.map(_.path).filter(name => name matches """.*lib""")
     for (libDir <- libDirs) {
       val inLibs = libDir.toDirectory.dirs.map(_.path)
       for (lib <- inLibs) {

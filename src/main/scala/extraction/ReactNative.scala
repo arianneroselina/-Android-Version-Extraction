@@ -2,13 +2,15 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
+import tools.Constants.{reactNativeFile, soExtension}
+import tools.HexEditor.bytesToHex
 import tools.Util.findFilesInLib
 import vulnerability.ReactNative.getVulnerabilities
 
 import scala.collection.immutable.HashMap
-import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.nio.file.Paths
-import scala.util.control.Breaks.breakable
+import java.io.IOException
+import java.nio.file.{Files, Path, Paths}
+import java.security.MessageDigest
 
 class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
@@ -20,21 +22,13 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
    * @param folderPath the path to the extracted APK folder
    * @return the mapping of the React Native version
    */
-  def extractReactNativeVersion(folderPath: String, logger: Logger): (String, JsValue) = {
+  def extractReactNativeVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
     logger.info("Starting React Native version extraction")
 
     try {
       // search for libreact*.so
-      val fileName = """libreact.*.so"""
-      val filePaths = findFilesInLib(folderPath, fileName)
-
-      // no libreact*.so found
-      if (filePaths == null || filePaths.isEmpty) {
-        logger.warn(s"$fileName is not found in $folderPath lib directory")
-        return null
-      }
-      logger.info("React Native implementation found")
+      val filePaths = findFilesInLib(folderPath, reactNativeFile + soExtension)
 
       // check which lib is the returned libreact*.so in
       var libType = ""
@@ -45,20 +39,9 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
       var versionWeight = new HashMap[String, Int]()
 
-      // run certutil
       for (filePath <- filePaths) {
-        val f = filePath.split(Array('\\', '/'))
-        val fileName = f(f.length-1)
-
-        val processBuilder = new ProcessBuilder("certutil", "-hashfile", filePath, "SHA256")
-        val process = processBuilder.start
-
-        // prepare to read the output
-        val stdout = process.getInputStream
-        val reader = new BufferedReader(new InputStreamReader(stdout))
-
         // extract the (most likely) React Native version
-        versionWeight = extractReactNativeVersion(reader, libType, fileName, versionWeight)
+        versionWeight = compareReactNativeHashes(filePath, libType, versionWeight)
       }
 
       // find and filter versions by the maximum weight
@@ -81,37 +64,30 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
   /**
    * Extract the React Native version from a buffered reader
    *
-   * @param reader the buffered reader of the output from certutil execution
-   * @param libType the lib directory type arm64-v8a, armeabi-v7a, x86, or x86_64
-   * @param fileName the filename
+   * @param filePath the file path
+   * @param libType  the lib directory type arm64-v8a, armeabi-v7a, x86, or x86_64
+   * @param versionWeight the weight for each version
    */
-  def extractReactNativeVersion(reader: BufferedReader, libType: String, fileName: String,
-                                versionWeight: HashMap[String, Int]): HashMap[String, Int] = {
+  def compareReactNativeHashes(filePath: String, libType: String, versionWeight: HashMap[String, Int]): HashMap[String, Int] = {
     try {
+      // hash the file
+      val b = Files.readAllBytes(Paths.get(filePath))
+      val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(b)).mkString("")
+
+      val fileName = Paths.get(filePath).getFileName.toString
       var copiedVersionWeight = versionWeight
-      var line = reader.readLine
-      breakable {
-        while (line != null) {
-          if (!line.contains("SHA256") && !line.contains("CertUtil")) {
-            val fileHash = line
-
-            // check which version the hash belongs to
-            val bufferedSource = io.Source.fromFile(
-              Paths.get(".").toAbsolutePath + "/src/files/hashes/react_native/" + libType + ".csv")
-            for (csvLine <- bufferedSource.getLines) {
-              val cols = csvLine.split(',').map(_.trim)
-              if (cols(1).equals(fileName) && cols(2).equals(fileHash) && !reactNativeVersion.contains(cols(0))) {
-                // add version's weight by one if hashes match
-                val value = if (copiedVersionWeight.contains(cols(0))) copiedVersionWeight(cols(0))+1 else 1
-                copiedVersionWeight += (cols(0) -> value)
-              }
-            }
-            bufferedSource.close
-          }
-
-          line = reader.readLine
+      // check which version the hash belongs to
+      val bufferedSource = io.Source.fromFile(
+        Paths.get(".").toAbsolutePath + "/src/files/hashes/react_native/" + libType + ".csv")
+      for (csvLine <- bufferedSource.getLines) {
+        val cols = csvLine.split(',').map(_.trim)
+        if (cols(1).equals(fileName) && cols(2).equals(hash) && !reactNativeVersion.contains(cols(0))) {
+          // add version's weight by one if hashes match
+          val value = if (copiedVersionWeight.contains(cols(0))) copiedVersionWeight(cols(0)) + 1 else 1
+          copiedVersionWeight += (cols(0) -> value)
         }
       }
+      bufferedSource.close
 
       copiedVersionWeight
     } catch {
