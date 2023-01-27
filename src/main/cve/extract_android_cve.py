@@ -10,9 +10,9 @@ def write_cve_links(version, cve_list_path):
         if not os.path.isfile(cve_list_path):
             raise RuntimeError("{} is not a valid path".format(cve_list_path))
 
-        csv_file = f'../../files/cve_links/Android-all.csv'
+        csv_file = f'../../files/vulnerability_links/AndroidAPI/Android-all.csv'
         if version != "-1":
-            csv_file = f'../../files/cve_links/Android-{version}.csv'
+            csv_file = f'../../files/vulnerability_links/AndroidAPI/Android-{version}.csv'
 
         with open(cve_list_path, 'r') as cve_list_read:
             next(cve_list_read)
