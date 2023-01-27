@@ -24,7 +24,7 @@ object VersionComparison {
         if (version1Array(2).toInt < version2Array(2).toInt) {
           1
         } else if (version1Array(2).toInt == version2Array(2).toInt) {
-          1
+          0
         } else -1
       } else -1
     } else -1
@@ -61,7 +61,7 @@ object VersionComparison {
             if (v1b < v2b) {
               1
             } else if (v1b == v2b) {
-              1
+              0
             } else -1
           } else -1
         } else -1
