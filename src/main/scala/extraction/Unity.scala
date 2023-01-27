@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import tools.Constants.unityFile
 import tools.HexEditor.{openHexFile, toAscii}
-import vulnerability.Unity.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getUnityVulnerabilities
 
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
@@ -12,6 +12,7 @@ import java.nio.file.{Files, Path, Paths}
 class Unity(var unityVersion: String = "") {
 
   var logger: Option[Logger] = None
+  var frameworkName = "Unity"
 
   /**
    * Extract the Unity version from the given APK, if Unity is used.
@@ -21,7 +22,7 @@ class Unity(var unityVersion: String = "") {
    */
   def extractUnityVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Unity version extraction")
+    logger.info(s"Starting $frameworkName version extraction")
 
     try {
       // search for file 0000000000000000f000000000000000
@@ -31,7 +32,7 @@ class Unity(var unityVersion: String = "") {
         extractUnityVersionFromFile(filePath)
       }
 
-      logger.info("Unity version extraction finished")
+      logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -66,18 +67,14 @@ class Unity(var unityVersion: String = "") {
 
     if (unityVersion.nonEmpty) {
       writeVersion = unityVersion
-      val links = getVersionVulnerability(unityVersion)
+      val links = getUnityVulnerabilities(unityVersion)
       versions = versions + (unityVersion -> Json.toJson(links))
     } else {
-      val msg = "No Unity version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Unity" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }

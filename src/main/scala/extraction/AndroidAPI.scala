@@ -1,7 +1,7 @@
 package extraction
 
 import com.typesafe.scalalogging.Logger
-import vulnerability.AndroidAPI.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getAndroidVulnerabilities
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.nio.file.{Files, Paths}
@@ -141,17 +141,18 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
     var versions = Json.obj()
     if (targetSdkVersion != -1 && minSdkVersion == -1) {
       // only targetSdkVersion found
-      val links = getVersionVulnerability(targetSdkVersion)
+      val links = getAndroidVulnerabilities(targetSdkVersion, withAndroidGeneral)
       versions = versions + (targetSdkVersion.toString -> Json.toJson(links))
     } else if (targetSdkVersion == -1 && minSdkVersion != -1) {
       // only minSdkVersion found
-      val links = getVersionVulnerability(minSdkVersion)
+      val links = getAndroidVulnerabilities(minSdkVersion, withAndroidGeneral)
       versions = versions + (minSdkVersion.toString -> Json.toJson(links))
     } else if (targetSdkVersion != -1 && minSdkVersion != -1) {
       // both versions found
       for (i <- 0 to range) {
-        val links = getVersionVulnerability(minSdkVersion + i)
-        versions = versions + ((minSdkVersion + i).toString -> Json.toJson(links))
+        val currentVersion = minSdkVersion + i
+        val links = getAndroidVulnerabilities(currentVersion, withAndroidGeneral)
+        versions = versions + (currentVersion.toString -> Json.toJson(links))
       }
     }
 
@@ -159,9 +160,5 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
       "targetSdkVersion" -> targetSdkVersion,
       "compileSdkVersion" -> compileSdkVersion,
       "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: Int): Array[String] = {
-    getVulnerabilities(version, withAndroidGeneral)
   }
 }

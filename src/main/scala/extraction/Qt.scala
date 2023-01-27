@@ -5,7 +5,7 @@ import play.api.libs.json._
 import tools.Constants.{qtFile, soExtension}
 import tools.HexEditor.bytesToHex
 import tools.Util.findFilesInLib
-import vulnerability.Qt.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getFrameworksVulnerabilities
 
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
@@ -14,6 +14,7 @@ import java.security.MessageDigest
 class Qt(var qtVersion: Array[String] = Array()) {
 
   var logger: Option[Logger] = None
+  var frameworkName = "Qt"
 
   /**
    * Extract the Qt version from the given APK, if Qt is used.
@@ -23,7 +24,7 @@ class Qt(var qtVersion: Array[String] = Array()) {
    */
   def extractQtVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Qt version extraction")
+    logger.info(s"Starting $frameworkName version extraction")
 
     try {
       // search for libQt*Core*.so
@@ -38,7 +39,7 @@ class Qt(var qtVersion: Array[String] = Array()) {
 
       // extract the Qt version
       extractQtVersion(filePaths(0), libType)
-      logger.info("Qt version extraction finished")
+      logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -59,11 +60,10 @@ class Qt(var qtVersion: Array[String] = Array()) {
       // hash the file
       val b = Files.readAllBytes(Paths.get(filePath))
       val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(b)).mkString("")
-      println(hash)
 
       // check which version the hash belongs to
       val bufferedSource = io.Source.fromFile(
-        Paths.get(".").toAbsolutePath + "/src/files/hashes/qt/" + libType + ".csv")
+        Paths.get(".").toAbsolutePath + s"/src/files/hashes/$frameworkName/$libType.csv")
       for (csvLine <- bufferedSource.getLines) {
         val cols = csvLine.split(',').map(_.trim)
         if (cols(1).equals(hash) && !qtVersion.contains(cols(0))) {
@@ -92,19 +92,15 @@ class Qt(var qtVersion: Array[String] = Array()) {
         } else {
           writeVersion += ", " + qtVersion(i)
         }
-        val links = getVersionVulnerability(qtVersion(i))
+        val links = getFrameworksVulnerabilities(frameworkName, qtVersion(i))
         versions = versions + (qtVersion(i) -> Json.toJson(links))
       }
     } else {
-      val msg = "No Qt version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Qt" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }

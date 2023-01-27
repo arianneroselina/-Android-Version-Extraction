@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import tools.Constants.{flutterFile, flutterFolders, soExtension}
 import tools.HexEditor.bytesToHex
-import vulnerability.Flutter.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getFrameworksVulnerabilities
 
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
@@ -13,6 +13,7 @@ import java.security.MessageDigest
 class Flutter(var flutterVersion: Array[String] = Array()) {
 
   var logger: Option[Logger] = None
+  var frameworkName = "Flutter"
 
   /**
    * Extract the Flutter version from the given APK, if Flutter is used.
@@ -22,7 +23,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
    */
   def extractFlutterVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Flutter version extraction")
+    logger.info(s"Starting $frameworkName version extraction")
 
     try {
       // search for libflutter.so
@@ -34,7 +35,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
         }
       }
 
-      logger.info("Flutter version extraction finished")
+      logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -58,7 +59,7 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
 
       // check which version the hash belongs to
       val bufferedSource = io.Source.fromFile(
-        Paths.get(".").toAbsolutePath + "/src/files/hashes/flutter/" + libType + ".csv")
+        Paths.get(".").toAbsolutePath + s"/src/files/hashes/$frameworkName/$libType.csv")
       for (csvLine <- bufferedSource.getLines) {
         val cols = csvLine.split(',').map(_.trim)
         if (cols(1).equals(hash) && !flutterVersion.contains(cols(0))) {
@@ -87,19 +88,15 @@ class Flutter(var flutterVersion: Array[String] = Array()) {
         } else {
           writeVersion += ", " + flutterVersion(i)
         }
-        val links = getVersionVulnerability(flutterVersion(i))
+        val links = getFrameworksVulnerabilities(frameworkName, flutterVersion(i))
         versions = versions + (flutterVersion(i) -> Json.toJson(links))
       }
     } else {
-      val msg = "No Flutter version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Flutter" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }

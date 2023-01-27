@@ -5,7 +5,7 @@ import play.api.libs.json._
 import tools.Constants.{reactNativeFile, soExtension}
 import tools.HexEditor.bytesToHex
 import tools.Util.findFilesInLib
-import vulnerability.ReactNative.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getFrameworksVulnerabilities
 
 import scala.collection.immutable.HashMap
 import java.io.IOException
@@ -15,6 +15,7 @@ import java.security.MessageDigest
 class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
   var logger: Option[Logger] = None
+  var frameworkName = "React Native"
 
   /**
    * Extract the React Native version from the given APK, if React Native is used.
@@ -24,7 +25,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
    */
   def extractReactNativeVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting React Native version extraction")
+    logger.info(s"Starting $frameworkName version extraction")
 
     try {
       // search for libreact*.so
@@ -51,7 +52,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         // only write the version if it has the maximum weight compared to the other versions
         reactNativeVersion = reactNativeVersion :+ v._1
       })
-      logger.info("React Native version extraction finished")
+      logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -78,7 +79,7 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
       var copiedVersionWeight = versionWeight
       // check which version the hash belongs to
       val bufferedSource = io.Source.fromFile(
-        Paths.get(".").toAbsolutePath + "/src/files/hashes/react_native/" + libType + ".csv")
+        Paths.get(".").toAbsolutePath + s"/src/files/hashes/$frameworkName/$libType.csv")
       for (csvLine <- bufferedSource.getLines) {
         val cols = csvLine.split(',').map(_.trim)
         if (cols(1).equals(fileName) && cols(2).equals(hash) && !reactNativeVersion.contains(cols(0))) {
@@ -112,19 +113,15 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
         } else {
           writeVersion += ", " + reactNativeVersion(i)
         }
-        val links = getVersionVulnerability(reactNativeVersion(i))
+        val links = getFrameworksVulnerabilities(frameworkName, reactNativeVersion(i))
         versions = versions + (reactNativeVersion(i) -> Json.toJson(links))
       }
     } else {
-      val msg = "No React Native version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "React Native" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }

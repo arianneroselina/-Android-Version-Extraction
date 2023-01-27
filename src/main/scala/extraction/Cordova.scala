@@ -3,7 +3,7 @@ package extraction
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import tools.Constants.cordovaFile
-import vulnerability.Cordova.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getFrameworksVulnerabilities
 
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
@@ -13,6 +13,7 @@ import scala.io.Source
 class Cordova(var cordovaVersion: String = "") {
 
   var logger: Option[Logger] = None
+  var frameworkName = "Cordova"
 
   /**
    * Extract the Cordova version from the given APK, if Cordova is used.
@@ -22,7 +23,7 @@ class Cordova(var cordovaVersion: String = "") {
    */
   def extractCordovaVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Cordova version extraction")
+    logger.info(s"Starting $frameworkName version extraction")
 
     try {
       // search for cordova.js
@@ -32,7 +33,7 @@ class Cordova(var cordovaVersion: String = "") {
         extractCordovaVersionFromFile(filePath)
       }
 
-      logger.info("Cordova version extraction finished")
+      logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -79,18 +80,14 @@ class Cordova(var cordovaVersion: String = "") {
 
     if (cordovaVersion.nonEmpty) {
       writeVersion = cordovaVersion
-      val links = getVersionVulnerability(cordovaVersion)
+      val links = getFrameworksVulnerabilities(frameworkName, cordovaVersion)
       versions = versions + (cordovaVersion -> Json.toJson(links))
     } else {
-      val msg = "No Cordova version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Cordova" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }

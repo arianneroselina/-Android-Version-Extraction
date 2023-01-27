@@ -4,17 +4,16 @@ import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
 import tools.Constants.{dllExtension, soExtension, xamarinDllFile, xamarinSoFile, xamarinSoFolders}
 import tools.HexEditor.bytesToHex
-import tools.Util.findFileInAssemblies
-import vulnerability.Xamarin.getVulnerabilities
+import vulnerability.VulnerabilityLinks.getFrameworksVulnerabilities
 
 import java.io.IOException
 import java.nio.file.{Files, Path, Paths}
 import java.security.MessageDigest
-import scala.collection.mutable.ArrayBuffer
 
 class Xamarin(var xamarinVersion: Array[String] = Array()) {
 
   var logger: Option[Logger] = None
+  var frameworkName = "Xamarin"
 
   /**
    * Extract the Xamarin.Android version from the given APK, if Xamarin is used.
@@ -24,7 +23,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
    */
   def extractXamarinVersion(folderPath: Path, logger: Logger): (String, JsValue) = {
     this.logger = Some(logger)
-    logger.info("Starting Xamarin.Android version extraction")
+    logger.info(s"Starting $frameworkName.Android version extraction")
 
     try {
       // search for libxa-internal-api.so
@@ -43,7 +42,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
         compareXamarinHashes(filePath, "assemblies")
       }
 
-      logger.info("Xamarin.Android version extraction finished")
+      logger.info(s"$frameworkName.Android version extraction finished")
 
       // return it as a JSON value
       createJson()
@@ -68,7 +67,7 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
 
         // check which version the hash belongs to
         val bufferedSource = io.Source.fromFile(
-          Paths.get(".").toAbsolutePath + "/src/files/hashes/xamarin/" + libType + ".csv")
+          Paths.get(".").toAbsolutePath + s"/src/files/hashes/$frameworkName/$libType.csv")
         for (csvLine <- bufferedSource.getLines) {
           val cols = csvLine.split(',').map(_.trim)
           if (cols(1).equals(hash) && !xamarinVersion.contains(cols(0))) {
@@ -97,19 +96,15 @@ class Xamarin(var xamarinVersion: Array[String] = Array()) {
         } else {
           writeVersion += ", " + xamarinVersion(i)
         }
-        val links = getVersionVulnerability(xamarinVersion(i))
+        val links = getFrameworksVulnerabilities(frameworkName, xamarinVersion(i))
         versions = versions + (xamarinVersion(i) -> Json.toJson(links))
       }
     } else {
-      val msg = "No Xamarin.Android version found, perhaps too old or too new?"
+      val msg = s"No $frameworkName.Android version found, perhaps too old or too new?"
       logger.get.warn(msg)
       writeVersion = msg
     }
 
-    "Xamarin.Android" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
-  }
-
-  def getVersionVulnerability(version: String): Array[String] = {
-    getVulnerabilities(version)
+    s"$frameworkName.Android" -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }
 }
