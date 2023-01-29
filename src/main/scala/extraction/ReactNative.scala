@@ -29,20 +29,15 @@ class ReactNative(var reactNativeVersion: Array[String] = Array()) {
 
     try {
       // search for libreact*.so
-      val filePaths = findFilesInLib(folderPath, reactNativeFile + soExtension)
-
-      // check which lib is the returned libreact*.so in
-      var libType = ""
-      if (filePaths(0).contains("arm64-v8a")) libType = "arm64-v8a"
-      else if (filePaths(0).contains("armeabi-v7a")) libType = "armeabi-v7a"
-      else if (filePaths(0).contains("x86")) libType = "x86"
-      else if (filePaths(0).contains("x86_64")) libType = "x86_64"
+      val libsToPaths = findFilesInLib(folderPath, reactNativeFile + soExtension)
 
       var versionWeight = new HashMap[String, Int]()
 
-      for (filePath <- filePaths) {
-        // extract the (most likely) React Native version
-        versionWeight = compareReactNativeHashes(filePath, libType, versionWeight)
+      for (libToPaths <- libsToPaths) {
+        // extract the (most likely) React Native versions
+        for (path <- libToPaths._2) {
+          versionWeight = compareReactNativeHashes(path, libToPaths._1, versionWeight)
+        }
       }
 
       // find and filter versions by the maximum weight

@@ -28,17 +28,13 @@ class Qt(var qtVersion: Array[String] = Array()) {
 
     try {
       // search for libQt*Core*.so
-      val filePaths = findFilesInLib(folderPath, qtFile + soExtension)
-
-      // check which lib is the returned libQt*Core*.so in
-      var libType = ""
-      if (filePaths(0).contains("arm64-v8a")) libType = "arm64-v8a"
-      else if (filePaths(0).contains("armeabi-v7a")) libType = "armeabi-v7a"
-      else if (filePaths(0).contains("x86")) libType = "x86"
-      else if (filePaths(0).contains("x86_64")) libType = "x86_64"
+      val libsToPaths = findFilesInLib(folderPath, qtFile + soExtension)
 
       // extract the Qt version
-      extractQtVersion(filePaths(0), libType)
+      for (libToPaths <- libsToPaths) {
+        assert(libToPaths._2.size == 1)
+        extractQtVersion(libToPaths._2(0), libToPaths._1)
+      }
       logger.info(s"$frameworkName version extraction finished")
 
       // return it as a JSON value
