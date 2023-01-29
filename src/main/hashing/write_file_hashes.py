@@ -1,6 +1,7 @@
 import sys
 import csv
 import glob
+import hashlib
 import os
 from os.path import exists
 import subprocess
@@ -17,10 +18,58 @@ react_native_folders = flutter_folders + ['x86']
 qt_folders = react_native_folders
 
 
-# get the hash of $file file from the given $folders folders, then write them in the
-# corresponding .csv files.
+def hash_file(filename):
+    """"Return the SHA-1 hash of the file passed into it"""
+
+    # make a hash object
+    h = hashlib.sha256()
+
+    # open file for reading in binary mode
+    with open(filename, 'rb') as file:
+        # loop till the end of the file
+        chunk = 0
+        while chunk != b'':
+            # read only 1024 bytes at a time
+            chunk = file.read(1024)
+            h.update(chunk)
+
+    # return the hex representation of digest
+    return h.hexdigest()
+
+
+def write_hash_to_file(filepath, version, csv_file):
+    output_hash = hash_file(filepath)
+
+    finish = False
+    versions_list = []
+
+    if exists(csv_file):
+        with open(csv_file, 'r') as csv_read:
+            csv_reader = csv.reader(csv_read)
+            for row in csv_reader:
+                change = False
+                for i in range(len(row)):
+                    if change:
+                        row[i] = output_hash
+                        change = False
+                        finish = True
+                    if row[i] == version:
+                        change = True
+                if len(row) != 0:
+                    versions_list.append(row)
+
+        with open(csv_file, 'w', newline='') as csv_write:
+            writer = csv.writer(csv_write)
+            writer.writerows(versions_list)
+
+    if not finish:
+        os.makedirs(os.path.dirname(csv_file), exist_ok=True)
+        with open(csv_file, 'a') as csv_append:
+            csv_append.write(version + ',' + output_hash)
+
+
 def hash_flutter_xamarin(version, path, framework_type, file, folders):
-    path = add_slash_to_path(path)
+    """"Get the hash of $file file from the given $folders folders, then write them in the corresponding .csv files."""
 
     for folder in folders:
         csv_file = f'../../files/hashes/{framework_type}/{folder}.csv'
@@ -30,46 +79,16 @@ def hash_flutter_xamarin(version, path, framework_type, file, folders):
             if not os.path.isfile(filepath):
                 continue
 
-            output = subprocess.check_output(one_file_command(filepath)).decode("utf-8")
-
-            start_index = output.find('so:') + 3
-            end_index = output.find('CertUtil', start_index)
-            output_hash = output[start_index + 1: end_index].strip()
-
-            finish = False
-            versions_list = []
-
-            if exists(csv_file):
-                with open(csv_file, 'r') as csv_read:
-                    csv_reader = csv.reader(csv_read)
-                    for row in csv_reader:
-                        change = False
-                        for i in range(len(row)):
-                            if change:
-                                row[i] = output_hash
-                                change = False
-                                finish = True
-                            if row[i] == version:
-                                change = True
-                        if len(row) != 0:
-                            versions_list.append(row)
-
-                with open(csv_file, 'w', newline='') as csv_write:
-                    writer = csv.writer(csv_write)
-                    writer.writerows(versions_list)
-
-            if not finish:
-                os.makedirs(os.path.dirname(csv_file), exist_ok=True)
-                with open(csv_file, 'a') as csv_append:
-                    csv_append.write(version + ',' + output_hash)
+            write_hash_to_file(filepath, version, csv_file)
 
         except subprocess.CalledProcessError as e:
             raise RuntimeError("Command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
 
-# get the hash of libreact*.so file from arm64_v8a, armeabi_v7a, x86, and x86_64 folders, then write them in the
-# corresponding .csv files.
 def hash_react_native(version, react_native_files):
+    """"Get the hash of libreact*.so file from arm64_v8a, armeabi_v7a, x86, and x86_64 folders,
+    then write them in the corresponding .csv files."""
+
     for filepath in react_native_files:
         splitted = str(filepath).split('\\')
         filename = splitted[len(splitted) - 1]
@@ -77,11 +96,7 @@ def hash_react_native(version, react_native_files):
         for folder in react_native_folders:
             csv_file = f'../../files/hashes/React Native/{folder}.csv'
             try:
-                output = subprocess.check_output(one_file_command(filepath)).decode("utf-8")
-
-                start_index = output.find('so:') + 3
-                end_index = output.find('CertUtil', start_index)
-                output_hash = output[start_index + 1: end_index].strip()
+                output_hash = hash_file(filepath)
 
                 finish = False
                 versions_list = []
@@ -114,9 +129,9 @@ def hash_react_native(version, react_native_files):
                 raise RuntimeError("Command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
 
-# get the hash of Java.Interop.dll file from assemblies folder, then write them in the corresponding .csv files.
 def hash_xamarin(version, path):
-    path = add_slash_to_path(path)
+    """"Get the hash of Java.Interop.dll file from assemblies folder, then write them in the corresponding .csv
+    files."""
 
     csv_file = f'../../files/hashes/Xamarin/assemblies.csv'
     try:
@@ -125,47 +140,15 @@ def hash_xamarin(version, path):
         if not os.path.isfile(filepath):
             return
 
-        output = subprocess.check_output(one_file_command(filepath)).decode("utf-8")
-
-        start_index = output.find('dll:') + 3
-        end_index = output.find('CertUtil', start_index)
-        output_hash = output[start_index + 1: end_index].strip()
-
-        finish = False
-        versions_list = []
-
-        if exists(csv_file):
-            with open(csv_file, 'r') as csv_read:
-                csv_reader = csv.reader(csv_read)
-                for row in csv_reader:
-                    change = False
-                    for i in range(len(row)):
-                        if change:
-                            row[i] = output_hash
-                            change = False
-                            finish = True
-                        if row[i] == version:
-                            change = True
-                    if len(row) != 0:
-                        versions_list.append(row)
-
-            with open(csv_file, 'w', newline='') as csv_write:
-                writer = csv.writer(csv_write)
-                writer.writerows(versions_list)
-
-        if not finish:
-            os.makedirs(os.path.dirname(csv_file), exist_ok=True)
-            with open(csv_file, 'a') as csv_append:
-                csv_append.write(version + ',' + output_hash)
+        write_hash_to_file(filepath, version, csv_file)
 
     except subprocess.CalledProcessError as e:
         raise RuntimeError("Command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
 
-# get the hash of libQt5/6Core...so file from arm64_v8a, armeabi_v7a, x86, and x86_64 folders, then write them in the
-# corresponding .csv files.
 def hash_qt(version, path):
-    path = add_slash_to_path(path)
+    """"Get the hash of libQt5/6Core...so file from arm64_v8a, armeabi_v7a, x86, and x86_64 folders, then write them in
+    the corresponding .csv files."""
 
     for folder in qt_folders:
         for qt_file in qt_files:
@@ -176,50 +159,10 @@ def hash_qt(version, path):
                 if not os.path.isfile(filepath):
                     continue
 
-                output = subprocess.check_output(one_file_command(filepath)).decode("utf-8")
-
-                start_index = output.find('so:') + 3
-                end_index = output.find('CertUtil', start_index)
-                output_hash = output[start_index + 1: end_index].strip()
-
-                finish = False
-                versions_list = []
-
-                if exists(csv_file):
-                    with open(csv_file, 'r') as csv_read:
-                        csv_reader = csv.reader(csv_read)
-                        for row in csv_reader:
-                            change = False
-                            for i in range(len(row)):
-                                if change:
-                                    row[i] = output_hash
-                                    change = False
-                                    finish = True
-                                if row[i] == version:
-                                    change = True
-                            if len(row) != 0:
-                                versions_list.append(row)
-
-                    with open(csv_file, 'w', newline='') as csv_write:
-                        writer = csv.writer(csv_write)
-                        writer.writerows(versions_list)
-
-                if not finish:
-                    os.makedirs(os.path.dirname(csv_file), exist_ok=True)
-                    with open(csv_file, 'a') as csv_append:
-                        csv_append.write(version + ',' + output_hash)
+                write_hash_to_file(filepath, version, csv_file)
 
             except subprocess.CalledProcessError as e:
                 raise RuntimeError("Command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
-
-
-def one_file_command(filename):
-    return 'certutil -hashfile \"' + filename + '\" SHA256'
-
-
-def multiple_files_command(path, filename):
-    print(path + filename)
-    return f'cd {path} && for %F in ({filename}) do @certutil -hashfile \"%F\" SHA256'
 
 
 def add_slash_to_path(path):
@@ -257,15 +200,15 @@ if __name__ == '__main__':
 
     path = add_slash_to_path(sys.argv[3])
 
-    if sys.argv[1] == "flutter":
-        hash_flutter_xamarin(sys.argv[2], sys.argv[3], "Flutter", flutter_file, flutter_folders)
+    if sys.argv[1].lower() == "flutter":
+        hash_flutter_xamarin(sys.argv[2], path, "Flutter", flutter_file, flutter_folders)
 
-    if sys.argv[1] == "react_native":
+    if sys.argv[1].lower() == "react_native":
         hash_react_native(sys.argv[2], glob.glob(path + 'lib\\' + react_native_folders[0] + '\\' + react_native_file))
 
-    if sys.argv[1] == "xamarin":
-        hash_flutter_xamarin(sys.argv[2], sys.argv[3], "Xamarin" xamarin_so_file, xamarin_folders)
-        hash_xamarin(sys.argv[2], sys.argv[3])
+    if sys.argv[1].lower() == "xamarin":
+        hash_flutter_xamarin(sys.argv[2], path, "Xamarin", xamarin_so_file, xamarin_folders)
+        hash_xamarin(sys.argv[2], path)
 
-    if sys.argv[1] == "qt":
-        hash_qt(sys.argv[2], sys.argv[3])
+    if sys.argv[1].lower() == "qt":
+        hash_qt(sys.argv[2], path)
