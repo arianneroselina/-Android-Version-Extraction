@@ -74,7 +74,7 @@ class OpenApk {
         createDirOrFile(outputDirPath, zipFile, entry)
       }
       // extract Unity file
-      if (entry.getName.contains("assets/bin/Data/" + unityFile)) {
+      if (entry.getName.matches("assets/bin/Data/" + unityFile)) {
         if (!unityUsed) {
           unityUsed = true
           logger.info("Unity implementation found")

@@ -1,5 +1,7 @@
 package tools
 
+import tools.Constants.unityFile
+
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
 import scala.collection.immutable.HashMap
@@ -40,5 +42,28 @@ object Util {
       }
     }
     libsToPaths
+  }
+
+  /**
+   * Find the path of one file with numbers in its name containing 32 chars inside the given directory.
+   *
+   * @param folderPath the path to the directory to be searched
+   * @return the file path
+   */
+  def findUnityFileInAssets(folderPath: Path): String = {
+    try {
+      val filePaths = folderPath.toFile.toDirectory.files
+        .filter(file => file.name matches unityFile)
+        .map(_.path)
+
+      for (filePath <- filePaths) {
+        if (Files.exists(Paths.get(filePath))) {
+          return filePath
+        }
+      }
+    } catch {
+      case _: Exception => //
+    }
+    ""
   }
 }

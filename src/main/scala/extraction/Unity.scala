@@ -2,8 +2,8 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import play.api.libs.json._
-import tools.Constants.unityFile
 import tools.HexEditor.{openHexFile, toAscii}
+import tools.Util.findUnityFileInAssets
 import vulnerability.VulnerabilityLinks.getUnityVulnerabilities
 
 import java.io.IOException
@@ -25,12 +25,10 @@ class Unity(var unityVersion: String = "") {
     logger.info(s"Starting $frameworkName version extraction")
 
     try {
-      // search for file 0000000000000000f000000000000000
-      val filePath = Paths.get(folderPath + "/assets/bin/Data/" + unityFile)
-      if (Files.exists(filePath)) {
-        // extract the Unity version
-        extractUnityVersionFromFile(filePath)
-      }
+      // search for any numbered file
+      val filePath = findUnityFileInAssets(Paths.get(folderPath + "/assets/bin/Data/"))
+      // extract the Unity version
+      extractUnityVersionFromFile(filePath)
 
       logger.info(s"$frameworkName version extraction finished")
 
@@ -43,14 +41,14 @@ class Unity(var unityVersion: String = "") {
   }
 
   /**
-   * Extract the Unity version from file 0000000000000000f000000000000000
+   * Extract the Unity version from the numbered file
    *
    * @param filePath the file path
    */
-  def extractUnityVersionFromFile(filePath: Path): Unit = {
+  def extractUnityVersionFromFile(filePath: String): Unit = {
     try {
-      val hexString = openHexFile(filePath.toString)
-      unityVersion = toAscii(hexString.substring(40, 62))
+      val hexString = openHexFile(filePath)
+      unityVersion = toAscii(hexString.substring(40, 62)).filter(s => s.isLetterOrDigit || s.equals('.'))
     } catch {
       case e: Exception => logger.get.error(e.getMessage)
     }

@@ -7,7 +7,7 @@ object Constants {
   val cordovaFile = """cordova.js"""
   val xamarinSoFile = "libxa-internal-api"
   val xamarinDllFile = "Java.Interop"
-  val unityFile = """0000000000000000f000000000000000"""
+  val unityFile = """[a-z0-9]{32}"""
 
   val soExtension = ".so"
   val dllExtension = ".dll"
