@@ -25,6 +25,7 @@ class Unity(var unityVersion: String = "") {
     logger.info(s"Starting $frameworkName version extraction")
 
     try {
+      // TODO : using libunity.so
       // search for any numbered file
       val filePath = findUnityFileInAssets(Paths.get(folderPath + "/assets/bin/Data/"))
       // extract the Unity version
