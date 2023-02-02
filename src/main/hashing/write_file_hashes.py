@@ -11,11 +11,9 @@ react_native_file = 'libreact*.so'
 xamarin_so_file = 'libxa-internal-api.so'
 xamarin_dll_file = 'Java.Interop.dll'
 qt_files = ['libQt5Core*.so', 'libQt6Core*.so']
+unity_file = 'libunity.so'
 
-xamarin_folders = ['arm64-v8a', 'armeabi-v7a']
-flutter_folders = xamarin_folders + ['x86_64']
-react_native_folders = flutter_folders + ['x86']
-qt_folders = react_native_folders
+abi_folders = ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86']
 
 
 def hash_file(filename):
@@ -68,10 +66,10 @@ def write_hash_to_file(filepath, version, csv_file):
             csv_append.write(version + ',' + output_hash)
 
 
-def hash_flutter_xamarin(version, path, framework_type, file, folders):
-    """"Get the hash of $file file from the given $folders folders, then write them in the corresponding .csv files."""
+def hash_flutter_xamarin_unity(version, path, framework_type, file):
+    """"Get the hash of $file file from the lib folder, then write them in the corresponding .csv files."""
 
-    for folder in folders:
+    for folder in abi_folders:
         csv_file = f'../../files/hashes/{framework_type}/{folder}.csv'
         try:
             # check if file exists
@@ -93,7 +91,7 @@ def hash_react_native(version, react_native_files):
         splitted = str(filepath).split('\\')
         filename = splitted[len(splitted) - 1]
 
-        for folder in react_native_folders:
+        for folder in abi_folders:
             csv_file = f'../../files/hashes/React Native/{folder}.csv'
             try:
                 output_hash = hash_file(filepath)
@@ -150,7 +148,7 @@ def hash_qt(version, path):
     """"Get the hash of libQt5/6Core...so file from arm64_v8a, armeabi_v7a, x86, and x86_64 folders, then write them in
     the corresponding .csv files."""
 
-    for folder in qt_folders:
+    for folder in abi_folders:
         for qt_file in qt_files:
             csv_file = f'../../files/hashes/Qt/{folder}.csv'
             try:
@@ -201,13 +199,16 @@ if __name__ == '__main__':
     path = add_slash_to_path(sys.argv[3])
 
     if sys.argv[1].lower() == "flutter":
-        hash_flutter_xamarin(sys.argv[2], path, "Flutter", flutter_file, flutter_folders)
+        hash_flutter_xamarin_unity(sys.argv[2], path, "Flutter", flutter_file)
+
+    if sys.argv[1].lower() == "unity":
+        hash_flutter_xamarin_unity(sys.argv[2], path, "Unity", unity_file)
 
     if sys.argv[1].lower() == "react_native":
-        hash_react_native(sys.argv[2], glob.glob(path + 'lib\\' + react_native_folders[0] + '\\' + react_native_file))
+        hash_react_native(sys.argv[2], glob.glob(path + 'lib\\' + abi_folders[0] + '\\' + react_native_file))
 
     if sys.argv[1].lower() == "xamarin":
-        hash_flutter_xamarin(sys.argv[2], path, "Xamarin", xamarin_so_file, xamarin_folders)
+        hash_flutter_xamarin_unity(sys.argv[2], path, "Xamarin", xamarin_so_file)
         hash_xamarin(sys.argv[2], path)
 
     if sys.argv[1].lower() == "qt":
