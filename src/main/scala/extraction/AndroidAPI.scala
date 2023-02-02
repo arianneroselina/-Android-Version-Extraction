@@ -1,20 +1,21 @@
 package extraction
 
 import com.typesafe.scalalogging.Logger
-import vulnerability.VulnerabilityLinks.getAndroidVulnerabilities
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.nio.file.{Files, Paths}
-import play.api.libs.json._
 
 import reflect.io._
 import Path._
 import scala.util.control.Breaks.{break, breakable}
 
-class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, var compileSdkVersion: Int = -1) {
+class AndroidAPI() {
 
   var logger: Option[Logger] = None
   var withAndroidGeneral = false
+  var minSdkVersion: Int = -1
+  var targetSdkVersion: Int = -1
+  var compileSdkVersion: Int = -1
 
   /**
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
@@ -23,7 +24,7 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
    * @param withAndroidGeneral true, if the vulnerabilities found generally in all versions should be included
    * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean, logger: Logger): (String, Json.JsValueWrapper) = {
+  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean, logger: Logger): Unit = {
     this.logger = Some(logger)
     this.withAndroidGeneral = withAndroidGeneral
     logger.info("Starting Android API version extraction")
@@ -46,11 +47,8 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
 
       // extract the android versions
       extractSdkVersions(reader)
-      // return it as a JSON value
-      createJson()
     } catch {
       case e: IOException => logger.error(e.getMessage)
-        null
     }
   }
 
@@ -128,37 +126,5 @@ class AndroidAPI(var minSdkVersion: Int = -1, var targetSdkVersion: Int = -1, va
     } catch {
       case e: IOException => logger.get.error(e.getMessage)
     }
-  }
-
-  /**
-   * Create a JSON from this class' object
-   *
-   * @return the mapping of the Android version
-   */
-  def createJson(): (String, Json.JsValueWrapper) = {
-    val range = targetSdkVersion - minSdkVersion
-
-    var versions = Json.obj()
-    if (targetSdkVersion != -1 && minSdkVersion == -1) {
-      // only targetSdkVersion found
-      val links = getAndroidVulnerabilities(targetSdkVersion, withAndroidGeneral)
-      versions = versions + (targetSdkVersion.toString -> Json.toJson(links))
-    } else if (targetSdkVersion == -1 && minSdkVersion != -1) {
-      // only minSdkVersion found
-      val links = getAndroidVulnerabilities(minSdkVersion, withAndroidGeneral)
-      versions = versions + (minSdkVersion.toString -> Json.toJson(links))
-    } else if (targetSdkVersion != -1 && minSdkVersion != -1) {
-      // both versions found
-      for (i <- 0 to range) {
-        val currentVersion = minSdkVersion + i
-        val links = getAndroidVulnerabilities(currentVersion, withAndroidGeneral)
-        versions = versions + (currentVersion.toString -> Json.toJson(links))
-      }
-    }
-
-    "AndroidAPI" -> Json.obj("minSdkVersion" -> minSdkVersion,
-      "targetSdkVersion" -> targetSdkVersion,
-      "compileSdkVersion" -> compileSdkVersion,
-      "Vulnerabilities" -> versions)
   }
 }

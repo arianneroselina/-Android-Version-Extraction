@@ -1,6 +1,6 @@
 package tools
 
-import java.io.{File, FileInputStream}
+import java.io.InputStream
 import scala.collection.mutable
 
 /**
@@ -15,23 +15,17 @@ object HexEditor {
   /**
    * Returns a hexadecimal string from a given file
    *
-   * @param filePath filepath
+   * @param is the input stream
    * @return a string containing the hexadecimal
    */
-  def openHexFile(filePath: String): String = {
-    val file = new File(filePath)
-    val file_bytes = new Array[Byte](file.length.toInt)
-    val fis = new FileInputStream(file)
+  def openHexFile(is: InputStream): String = {
+    val length = is.available()
+    val file_bytes = new Array[Byte](length)
 
     var bytes_read = 0
-    do bytes_read = fis.read(file_bytes) while ( {
-      bytes_read != -1
-    })
+    do bytes_read = is.read(file_bytes) while (bytes_read != -1)
 
-    val hexString = new String(bytesToHex(file_bytes))
-    fis.close()
-
-    hexString
+    new String(bytesToHex(file_bytes))
   }
 
   /**

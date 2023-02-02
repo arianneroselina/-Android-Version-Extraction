@@ -2,23 +2,33 @@ package extraction
 
 import com.typesafe.scalalogging.Logger
 import org.apache.commons.cli.{DefaultParser, Options}
-import play.api.libs.json.{JsValue, Json}
+import tools.Constants._
+import tools.HexEditor.bytesToHex
 
-import java.io.BufferedWriter
-import java.io.File
-import java.io.FileWriter
 import java.io.IOException
-import java.nio.file.{FileSystems, Files, Path, Paths}
-import scala.jdk.CollectionConverters.IteratorHasAsScala
+import java.nio.file.{Path, Paths}
+import java.security.MessageDigest
+import java.util.zip.{ZipEntry, ZipFile}
+import scala.jdk.CollectionConverters.EnumerationHasAsScala
 
 object Main {
 
   var apkFilePath = ""
-  var apkFilesDir = ""
+  var apkFilePaths = ""
+  var zipFile: Option[ZipFile] = None
   val options = new Options()
 
+  // keep track of found frameworks
+  var cordovaFound = false
+  var flutterFound = false
+  var reactNativeFound = false
+  var qtFound = false
+  var unityFound = false
+  var xamarinFound = false
+
+
   options.addOption("f", "apk-filepath", true, "input file <apk file path>")
-  options.addOption("d", "apk-files-directory", true, "input files <apk files directory path>")
+  options.addOption("d", "apk-filepaths", true, "path to file containing <apk file paths>")
   options.addOption("a", "android-general", false, "include general android vulnerability links")
 
   val logger: Logger = Logger("AndroidVersionExtraction")
@@ -44,10 +54,17 @@ object Main {
         androidAppVulnerabilityDetection(Paths.get(apkFilePath), commandline.hasOption("a"))
       }
       else if (commandline.hasOption("d")) {
-        apkFilesDir = commandline.getOptionValue("d")
-        val dir = FileSystems.getDefault.getPath("apkFilesDir")
-        Files.list(dir).iterator().asScala.foreach(file =>
-          androidAppVulnerabilityDetection(file, commandline.hasOption("a")))
+        apkFilePaths = commandline.getOptionValue("d")
+
+        try {
+          val bufferedSource = io.Source.fromFile(apkFilePaths)
+          for (apkFile <- bufferedSource.getLines) {
+            androidAppVulnerabilityDetection(Paths.get(apkFile), commandline.hasOption("a"))
+          }
+          bufferedSource.close
+        } catch {
+          case e: IOException => logger.error(e.getMessage)
+        }
       }
 
       logger.info("All done")
@@ -78,71 +95,107 @@ object Main {
     }
     logger.info("Got the .apk file " + apkFilePath)
 
-    // open the APK file
-    val openedApk: OpenApk = new OpenApk
-    openedApk.openApkFile(apkFilePath, logger)
-
     // extract the Android version information
-    val androidJSON = (new AndroidAPI).extractAndroidAPIVersion(apkFilePath.toString, withAndroidGeneral, logger)
+    val android = new AndroidAPI
+    android.extractAndroidAPIVersion(apkFilePath.toString, withAndroidGeneral, logger)
 
-    // extract the Flutter version information
-    var flutterJSON: (String, JsValue) = null
-    if (openedApk.flutterUsed) {
-      flutterJSON = (new Flutter).extractFlutterVersion(openedApk.outputDirPath, logger)
-    }
+    val frameworks = new ExtractFrameworkVersions
 
-    // extract the React Native version information
-    var reactNativeJSON: (String, JsValue) = null
-    if (openedApk.reactNativeUsed) {
-      reactNativeJSON = (new ReactNative).extractReactNativeVersion(openedApk.outputDirPath, logger)
-    }
+    // iterate through the zip file and run framework version extraction if a certain file is found
+    zipFile = Some(new ZipFile(apkFilePath.toFile))
+    for (entry <- zipFile.get.entries.asScala) {
 
-    // extract the Apache Cordova version information
-    var cordovaJSON: (String, JsValue) = null
-    if (openedApk.cordovaUsed) {
-      cordovaJSON = (new Cordova).extractCordovaVersion(openedApk.outputDirPath, logger)
-    }
+      if (entry.getName.contains(flutterFile)) {
+        // extract the Flutter version information
+        if (!flutterFound) logger.info(s"$flutterName implementation found")
 
-    // extract the Unity version information
-    var unityJSON: (String, JsValue) = null
-    if (openedApk.unityUsed) {
-      unityJSON = (new Unity).extractUnityVersion(openedApk.outputDirPath, logger)
-    }
+        val hash = hashFile(entry)
+        val libType = Paths.get(entry.getName).getParent.getFileName.toString
+        frameworks.compareHashes(flutterName, hash, libType, logger)
 
-    // extract the Xamarin.Android version information
-    var xamarinJSON: (String, JsValue) = null
-    if (openedApk.xamarinUsed) {
-      xamarinJSON = (new Xamarin).extractXamarinVersion(openedApk.outputDirPath, logger)
-    }
+        if (!flutterFound) logger.info(s"$flutterName version extraction finished")
+        flutterFound = true
+      }
 
-    // extract the Qt version information
-    var qtJSON: (String, JsValue) = null
-    if (openedApk.qtUsed) {
-      qtJSON = (new Qt).extractQtVersion(openedApk.outputDirPath, logger)
+      if (entry.getName.matches(""".*""" + reactNativeFile)) {
+        // extract the React Native version information
+        if (!reactNativeFound) logger.info(s"$reactNativeName implementation found")
+
+        val hash = hashFile(entry)
+        val entryName = Paths.get(entry.getName)
+        val fileName = entryName.getFileName.toString
+        val libType = entryName.getParent.getFileName.toString
+        frameworks.compareReactNativeHashes(hash, fileName, libType, logger)
+
+        if (!reactNativeFound) logger.info(s"$reactNativeName version extraction finished")
+        reactNativeFound = true
+      }
+
+      if (entry.getName.matches(""".*""" + qtFile)) {
+        // extract the Qt version information
+        if (!qtFound) logger.info(s"$qtName implementation found")
+
+        val hash = hashFile(entry)
+        val libType = Paths.get(entry.getName).getParent.getFileName.toString
+        frameworks.compareHashes(qtName, hash, libType, logger)
+
+        if (!qtFound) logger.info(s"$qtName version extraction finished")
+        qtFound = true
+      }
+
+      if (entry.getName.contains(xamarinSoFile) || entry.getName.contains(xamarinDllFile)) {
+        // extract the Xamarin version information
+        if (!xamarinFound) logger.info(s"$xamarinName implementation found")
+
+        val hash = hashFile(entry)
+        val libType = Paths.get(entry.getName).getParent.getFileName.toString
+        frameworks.compareHashes(xamarinName, hash, libType, logger)
+
+        if (!xamarinFound) logger.info(s"$xamarinName version extraction finished")
+        xamarinFound = true
+      }
+
+      if (entry.getName.contains(cordovaFile)) {
+        // extract the Cordova version information
+        if (!cordovaFound) logger.info(s"$cordovaName implementation found")
+        frameworks.extractCordovaVersion(zipFile.get.getInputStream(entry), logger)
+        if (!cordovaFound) logger.info(s"$cordovaName version extraction finished")
+        cordovaFound = true
+      }
+
+      // extract the Unity version information using the two methods
+      if (entry.getName.matches(""".*""" + unityNumberedFile)) {
+        if (!unityFound) logger.info(s"$unityName implementation found")
+        frameworks.extractUnityVersion(zipFile.get.getInputStream(entry), logger)
+        if (!unityFound) logger.info(s"$unityName version extraction finished")
+        unityFound = true
+      }
+
+      if (entry.getName.contains(unitySoFile)) {
+        if (!unityFound) logger.info(s"$unityName implementation found")
+
+        val hash = hashFile(entry)
+        val libType = Paths.get(entry.getName).getParent.getFileName.toString
+        frameworks.compareHashes(unityName, hash, libType, logger)
+
+        if (!unityFound) logger.info(s"$unityName version extraction finished")
+        unityFound = true
+      }
     }
 
     // write the JSON value to JSON file
-    logger.info("Writing output file")
-    val file = new File(openedApk.outputDirPath + ".json")
-    try {
-      val bw = new BufferedWriter(new FileWriter(file))
+    (new JsonWriter).writeJsonFile(android, frameworks)
+  }
 
-      // write versions and vulnerabilities to a JSON file
-      var print = Json.obj(androidJSON)
-      if (flutterJSON != null) print += flutterJSON
-      if (reactNativeJSON != null) print += reactNativeJSON
-      if (cordovaJSON != null) print += cordovaJSON
-      if (unityJSON != null) print += unityJSON
-      if (xamarinJSON != null) print += xamarinJSON
-      if (qtJSON != null) print += qtJSON
-      print += "inherit" -> Json.toJson(true)
-
-      bw.write(Json.prettyPrint(print))
-      bw.newLine()
-      bw.close()
-    } catch {
-      case e: IOException => logger.error(e.getMessage)
-        sys.exit(-1)
-    }
+  /**
+   * Hash the file at the given entry
+   *
+   * @param entry the current ZipEntry
+   * @return the hash of the file at the entry
+   */
+  def hashFile(entry: ZipEntry): String = {
+    val is = zipFile.get.getInputStream(entry)
+    val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(is.readAllBytes())).mkString("")
+    hash
   }
 }
