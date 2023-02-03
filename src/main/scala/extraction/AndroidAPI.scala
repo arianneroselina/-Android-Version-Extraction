@@ -11,7 +11,6 @@ import scala.util.control.Breaks.{break, breakable}
 
 class AndroidAPI() {
 
-  var _withAndroidGeneral = false
   var _minSdkVersion: Int = -1
   var _targetSdkVersion: Int = -1
   var _compileSdkVersion: Int = -1
@@ -20,11 +19,9 @@ class AndroidAPI() {
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
    *
    * @param apkFilePath the APK file path
-   * @param withAndroidGeneral true, if the vulnerabilities found generally in all versions should be included
    * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean): Unit = {
-    this._withAndroidGeneral = withAndroidGeneral
+  def extractAndroidAPIVersion(apkFilePath: String): Unit = {
     _logger.info("Starting Android API version extraction")
 
     try {

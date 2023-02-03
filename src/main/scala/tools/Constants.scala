@@ -4,6 +4,7 @@ object Constants {
   val cordovaName = "Cordova"
   val flutterName = "Flutter"
   val reactNativeName = "React Native"
+  val reactNativeShortName = "React"
   val qtName = "Qt"
   val unityName = "Unity"
   val xamarinName = "Xamarin"

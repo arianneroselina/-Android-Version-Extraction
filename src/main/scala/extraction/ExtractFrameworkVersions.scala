@@ -1,6 +1,7 @@
 package extraction
 
 import extraction.Main._logger
+import tools.Comparison.dateLaterThan
 import tools.Constants.{cordovaName, reactNativeName, unityName}
 import tools.HexEditor.{openHexFile, toAscii}
 
@@ -19,7 +20,7 @@ class ExtractFrameworkVersions() {
    * This function is used by Flutter, Qt, Unity, and Xamarin.
    *
    * @param frameworkName the framework's name
-   * @param hash          the file path
+   * @param hash          the file hash
    * @param libType       the ABI directory type
    */
   def compareHashes(frameworkName: String, hash: String, libType: String): Unit = {
@@ -40,6 +41,7 @@ class ExtractFrameworkVersions() {
             _frameworkVersions += (frameworkName -> ArrayBuffer(cols(0)))
             _byDates += (frameworkName -> false)
           }
+          _logger.info(s"Found $frameworkName version")
         }
       }
       bufferedSource.close
@@ -52,9 +54,9 @@ class ExtractFrameworkVersions() {
    * Compare the given hash with the one in the generated tables.
    * This function is used by React Native.
    *
-   * @param hash          the file path
-   * @param fileName      the filename
-   * @param libType       the ABI directory type
+   * @param hash     the file hash
+   * @param fileName the filename
+   * @param libType  the ABI directory type
    */
   def compareReactNativeHashes(hash: String, fileName: String, libType: String): Unit = {
     try {
@@ -74,6 +76,7 @@ class ExtractFrameworkVersions() {
             _frameworkVersions += (reactNativeName -> ArrayBuffer(cols(0)))
             _byDates += (reactNativeName -> false)
           }
+          _logger.info(s"Found $reactNativeName version")
         }
       }
       bufferedSource.close
@@ -101,6 +104,7 @@ class ExtractFrameworkVersions() {
             // there is only one cordova.js file
             _frameworkVersions += (cordovaName -> ArrayBuffer(trimmed.substring(index + 2, trimmed.length - 2)))
             _byDates += (cordovaName -> false)
+            _logger.info(s"Found $cordovaName version")
             break
           }
         }
@@ -124,6 +128,7 @@ class ExtractFrameworkVersions() {
       _frameworkVersions += (unityName ->
         ArrayBuffer(toAscii(hexString.substring(40, 62)).filter(s => s.isLetterOrDigit || s.equals('.'))))
       _byDates += (unityName -> false)
+      _logger.info(s"Found $unityName version")
       inputStream.close()
     } catch {
       case e: Exception => _logger.error(e.getMessage)
@@ -133,10 +138,46 @@ class ExtractFrameworkVersions() {
   /**
    * Extract the framework version by comparing the dates of the app creation and the released framework version.
    *
-   * @param fileName     the filename
-   * @param creationTime the file's date of creation
+   * @param frameworkName the framework's name
+   * @param lastModDate   the file's last modified date
    */
-  def extractFrameworkVersionByDate(fileName: String, creationTime: String): Unit = {
+  def byDate(frameworkName: String, lastModDate: String): Unit = {
+    if (lastModDate == null) return
 
+    try {
+      // check which version the hash belongs to
+      val bufferedSource = io.Source.fromFile(
+        Paths.get(".").toAbsolutePath + s"/src/files/publish_date/$frameworkName.csv")
+
+      var closestDate = ""
+      breakable {
+        for (csvLine <- bufferedSource.getLines) {
+          val cols = csvLine.split(',').map(_.trim)
+
+          if (dateLaterThan(lastModDate, cols(1))) {
+            if (closestDate.isEmpty || closestDate.equals(cols(1))) {
+              // hashes match
+              if (_frameworkVersions.contains(frameworkName)) {
+                if (!_frameworkVersions(frameworkName).contains(cols(0))) {
+                  _frameworkVersions(frameworkName) += cols(0)
+                }
+              } else {
+                _frameworkVersions += (frameworkName -> ArrayBuffer(cols(0)))
+                _byDates += (frameworkName -> true)
+              }
+
+              closestDate = cols(1)
+              _logger.info(s"Found $frameworkName version")
+            } else {
+              break
+            }
+          }
+        }
+      }
+
+      bufferedSource.close
+    } catch {
+      case e: IOException => _logger.error(e.getMessage)
+    }
   }
 }

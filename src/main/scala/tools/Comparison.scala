@@ -1,6 +1,6 @@
 package tools
 
-object VersionComparison {
+object Comparison {
 
   /**
    * Check if the first version is older than the second one.
@@ -11,7 +11,7 @@ object VersionComparison {
    *         0 if version1 == version2
    *         -1 if version1 is newer than version2
    */
-  def olderThan(version1: String, version2: String): Int = {
+  def versionOlderThan(version1: String, version2: String): Int = {
     val version1Array = version1.split('.')
     val version2Array = version2.split('.')
 
@@ -39,7 +39,7 @@ object VersionComparison {
    *         0 if version1 == version2
    *         -1 if version1 is newer than version2
    */
-  def olderThanForUnity(version1: String, version2: String): Int = {
+  def versionOlderThanForUnity(version1: String, version2: String): Int = {
     val version1Array = version1.split('.')
     val version2Array = version2.split('.')
 
@@ -67,5 +67,29 @@ object VersionComparison {
         } else -1
       } else -1
     } else -1
+  }
+
+  /**
+   * Check if the first date is later than the second date.
+   *
+   * @param date1 the first version (x.x.x)
+   * @param date2 the second version (x.x.x)
+   * @return true if date1 is later or equal date2
+   */
+  def dateLaterThan(date1: String, date2: String): Boolean = {
+    val date1Array = date1.split('.')
+    val date2Array = date2.split('.')
+
+    if (date1Array(2).toInt > date2Array(2).toInt) {
+      true
+    } else if (date1Array(2).toInt == date2Array(2).toInt) {
+      if (date1Array(1).toInt > date2Array(1).toInt) {
+        true
+      } else if (date1Array(1).toInt == date2Array(1).toInt) {
+        if (date1Array(0).toInt >= date2Array(0).toInt) {
+          true
+        } else false
+      } else false
+    } else false
   }
 }
