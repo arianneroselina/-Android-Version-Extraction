@@ -42,8 +42,9 @@ class AndroidAPI() {
 
       // extract the android versions
       extractSdkVersions(reader)
+      _logger.info("Finished Android API version extraction")
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"extractAndroidAPIVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -78,7 +79,7 @@ class AndroidAPI() {
                 return aaptPath
               }
             } catch {
-              case _: Exception => // do nothing
+              case e: Exception => _logger.error(s"findAaptPath() throws an error with message: ${e.getMessage}")
             }
           }
         }
@@ -119,7 +120,7 @@ class AndroidAPI() {
         }
       }
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"extractSdkVersions() throws an error with message: ${e.getMessage}")
     }
   }
 }

@@ -40,13 +40,13 @@ class ExtractFrameworkVersions() {
           } else {
             _frameworkVersions += (frameworkName -> ArrayBuffer(cols(0)))
             _byDates += (frameworkName -> false)
+            _logger.info(s"Found $frameworkName version")
           }
-          _logger.info(s"Found $frameworkName version")
         }
       }
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"compareHashes() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -75,13 +75,13 @@ class ExtractFrameworkVersions() {
           } else {
             _frameworkVersions += (reactNativeName -> ArrayBuffer(cols(0)))
             _byDates += (reactNativeName -> false)
+            _logger.info(s"Found $reactNativeName version")
           }
-          _logger.info(s"Found $reactNativeName version")
         }
       }
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"compareReactNativeHashes() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -99,12 +99,14 @@ class ExtractFrameworkVersions() {
         while (reader.ready()) {
           val line = reader.readLine()
           if (line.contains(keyword)) {
+            if (!_frameworkVersions.contains(cordovaName))
+              _logger.info(s"Found $cordovaName version")
+
             val trimmed = line.replaceAll("\\s", "")
             val index = trimmed.indexOf("=")
             // there is only one cordova.js file
             _frameworkVersions += (cordovaName -> ArrayBuffer(trimmed.substring(index + 2, trimmed.length - 2)))
             _byDates += (cordovaName -> false)
-            _logger.info(s"Found $cordovaName version")
             break
           }
         }
@@ -113,7 +115,7 @@ class ExtractFrameworkVersions() {
       inputStream.close()
     } catch {
       case _: IndexOutOfBoundsException => _logger.error("PLATFORM_VERSION_BUILD_LABEL is not specified in cordova.js")
-      case e: Exception => _logger.error(e.getMessage)
+      case e: Exception => _logger.error(s"extractCordovaVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -124,14 +126,16 @@ class ExtractFrameworkVersions() {
    */
   def extractUnityVersion(inputStream: InputStream): Unit = {
     try {
+      if (!_frameworkVersions.contains(unityName))
+        _logger.info(s"Found $unityName version")
+
       val hexString = openHexFile(inputStream)
       _frameworkVersions += (unityName ->
         ArrayBuffer(toAscii(hexString.substring(40, 62)).filter(s => s.isLetterOrDigit || s.equals('.'))))
       _byDates += (unityName -> false)
-      _logger.info(s"Found $unityName version")
       inputStream.close()
     } catch {
-      case e: Exception => _logger.error(e.getMessage)
+      case e: Exception => _logger.error(s"extractUnityVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -142,7 +146,7 @@ class ExtractFrameworkVersions() {
    * @param lastModDate   the file's last modified date
    */
   def byDate(frameworkName: String, lastModDate: String): Unit = {
-    if (lastModDate == null) return
+    if (lastModDate == null || lastModDate.equals("")) return
 
     try {
       // check which version the hash belongs to
@@ -177,7 +181,7 @@ class ExtractFrameworkVersions() {
 
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"byDate() throws an error with message: ${e.getMessage}")
     }
   }
 }

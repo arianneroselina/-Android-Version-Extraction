@@ -1,12 +1,13 @@
 package extraction
 
-import extraction.Main._
+import extraction.Main.{_logger, _withAndroidGeneral}
 import play.api.libs.json.{JsValue, Json}
 import tools.Constants._
 import tools.Comparison.{versionOlderThan, versionOlderThanForUnity}
 import vulnerability.VulnerabilityLinks.{getAndroidVulnerabilities, getFrameworksVulnerabilities, getUnityVulnerabilities}
 
 import java.io.{BufferedWriter, File, FileWriter, IOException}
+import java.nio.file.Path
 import scala.collection.mutable.ArrayBuffer
 
 class JsonWriter {
@@ -15,12 +16,15 @@ class JsonWriter {
   /**
    * Write the output JSON file.
    *
-   * @param android    the AndroidAPI object
-   * @param frameworks the ExtractFrameworkVersions object
+   * @param apkFilePath the given APK file path
+   * @param detection   the VulnerabilityDetection object
+   * @param android     the AndroidAPI object
+   * @param frameworks  the ExtractFrameworkVersions object
    */
-  def writeJsonFile(android: AndroidAPI, frameworks: ExtractFrameworkVersions): Unit = {
+  def writeJsonFile(apkFilePath: Path, detection: VulnerabilityDetection, android: AndroidAPI,
+                    frameworks: ExtractFrameworkVersions): Unit = {
     _logger.info("Writing output file")
-    val file = new File(_apkFilePath.replaceFirst("[.][^.]+$", "") + ".json")
+    val file = new File(apkFilePath.toString.replaceFirst("[.][^.]+$", "") + ".json")
     try {
       val bw = new BufferedWriter(new FileWriter(file))
 
@@ -29,49 +33,59 @@ class JsonWriter {
       var print = Json.obj(androidJSON)
 
       var versions: ArrayBuffer[String] = new ArrayBuffer()
-      if (_flutterFound) {
+      var byDate: Boolean = false
+
+      if (detection._flutterFound) {
         if (frameworks._frameworkVersions.contains(flutterName)) {
           versions = frameworks._frameworkVersions(flutterName)
+          byDate = frameworks._byDates(flutterName)
         }
-        print += createJson(flutterName, versions, frameworks._byDates(flutterName))
+        print += createJson(flutterName, versions, byDate)
       }
-      if (_reactNativeFound) {
+      if (detection._reactNativeFound) {
         if (frameworks._frameworkVersions.contains(reactNativeName)) {
           versions = frameworks._frameworkVersions(reactNativeName)
+          byDate = frameworks._byDates(reactNativeName)
         }
-        print += createJson(reactNativeName, versions, frameworks._byDates(reactNativeName))
+        print += createJson(reactNativeName, versions, byDate)
       }
-      if (_qtFound) {
+      if (detection._qtFound) {
         if (frameworks._frameworkVersions.contains(qtName)) {
           versions = frameworks._frameworkVersions(qtName)
+          byDate = frameworks._byDates(qtName)
         }
-        print += createJson(qtName, versions, frameworks._byDates(qtName))
+        print += createJson(qtName, versions, byDate)
       }
-      if (_xamarinFound) {
+      if (detection._xamarinFound) {
         if (frameworks._frameworkVersions.contains(xamarinName)) {
           versions = frameworks._frameworkVersions(xamarinName)
+          byDate = frameworks._byDates(xamarinName)
         }
-        print += createJson(xamarinName, versions, frameworks._byDates(xamarinName))
+        print += createJson(xamarinName, versions, byDate)
       }
-      if (_cordovaFound) {
+      if (detection._cordovaFound) {
         if (frameworks._frameworkVersions.contains(cordovaName)) {
           versions = frameworks._frameworkVersions(cordovaName)
+          byDate = frameworks._byDates(cordovaName)
         }
-        print += createJson(cordovaName, versions, frameworks._byDates(cordovaName))
+        print += createJson(cordovaName, versions, byDate)
       }
-      if (_unityFound) {
+      if (detection._unityFound) {
         if (frameworks._frameworkVersions.contains(unityName)) {
           versions = frameworks._frameworkVersions(unityName)
+          byDate = frameworks._byDates(unityName)
         }
-        print += createJson(unityName, versions, frameworks._byDates(unityName))
+        print += createJson(unityName, versions, byDate)
       }
       print += "inherit" -> Json.toJson(true)
 
       bw.write(Json.prettyPrint(print))
       bw.newLine()
       bw.close()
+
+      _logger.info("Finished writing output file")
     } catch {
-      case e: IOException => _logger.error(e.getMessage)
+      case e: IOException => _logger.error(s"writeJsonFile() throws an error with message: ${e.getMessage}")
         sys.exit(-1)
     }
   }
