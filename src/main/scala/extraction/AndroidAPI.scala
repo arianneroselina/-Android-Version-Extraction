@@ -1,6 +1,6 @@
 package extraction
 
-import com.typesafe.scalalogging.Logger
+import extraction.Main._logger
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 import java.nio.file.{Files, Paths}
@@ -11,11 +11,10 @@ import scala.util.control.Breaks.{break, breakable}
 
 class AndroidAPI() {
 
-  var logger: Option[Logger] = None
-  var withAndroidGeneral = false
-  var minSdkVersion: Int = -1
-  var targetSdkVersion: Int = -1
-  var compileSdkVersion: Int = -1
+  var _withAndroidGeneral = false
+  var _minSdkVersion: Int = -1
+  var _targetSdkVersion: Int = -1
+  var _compileSdkVersion: Int = -1
 
   /**
    * Extract minSdkVersion, targetSdkVersion, and compileSdkVersion from the given APK
@@ -24,16 +23,15 @@ class AndroidAPI() {
    * @param withAndroidGeneral true, if the vulnerabilities found generally in all versions should be included
    * @return the mapping of the Android version
    */
-  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean, logger: Logger): Unit = {
-    this.logger = Some(logger)
-    this.withAndroidGeneral = withAndroidGeneral
-    logger.info("Starting Android API version extraction")
+  def extractAndroidAPIVersion(apkFilePath: String, withAndroidGeneral: Boolean): Unit = {
+    this._withAndroidGeneral = withAndroidGeneral
+    _logger.info("Starting Android API version extraction")
 
     try {
       // get the aapt.exe path
       val aaptPath = findAaptPath("aapt.exe")
       if (aaptPath == null) {
-        logger.error(s"aapt.exe command not found at path $aaptPath")
+        _logger.error(s"aapt.exe command not found at path $aaptPath")
         sys.exit(1)
       }
 
@@ -48,7 +46,7 @@ class AndroidAPI() {
       // extract the android versions
       extractSdkVersions(reader)
     } catch {
-      case e: IOException => logger.error(e.getMessage)
+      case e: IOException => _logger.error(e.getMessage)
     }
   }
 
@@ -112,19 +110,19 @@ class AndroidAPI() {
             val version = Integer.parseInt(versionStr, 16) // convert hex to int
 
             line match {
-              case MinPattern() => minSdkVersion = version
-              case TargetPattern() => targetSdkVersion = version
-              case CompilePattern() => compileSdkVersion = version
+              case MinPattern() => _minSdkVersion = version
+              case TargetPattern() => _targetSdkVersion = version
+              case CompilePattern() => _compileSdkVersion = version
               case _ =>
             }
           }
 
-          if (minSdkVersion >= 0 && targetSdkVersion >= 0 && compileSdkVersion >= 0) break
+          if (_minSdkVersion >= 0 && _targetSdkVersion >= 0 && _compileSdkVersion >= 0) break
           line = reader.readLine
         }
       }
     } catch {
-      case e: IOException => logger.get.error(e.getMessage)
+      case e: IOException => _logger.error(e.getMessage)
     }
   }
 }

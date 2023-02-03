@@ -10,7 +10,7 @@ import scala.collection.mutable
 object HexEditor {
 
   /** Stores characters of the hexadecimal numeral system */
-  private val hexCharacters = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
+  private val _hexCharacters = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
 
   /**
    * Returns a hexadecimal string from a given file
@@ -42,8 +42,8 @@ object HexEditor {
     var i = 0
     var j = 0
     while (i < bytes.length) {
-      hexFormat(j) = hexCharacters((bytes(i) & 0xf0) >>> 4)
-      hexFormat(j + 1) = hexCharacters(bytes(i) & 0x0f)
+      hexFormat(j) = _hexCharacters((bytes(i) & 0xf0) >>> 4)
+      hexFormat(j + 1) = _hexCharacters(bytes(i) & 0x0f)
 
       i += 1
       j = i * 2

@@ -1,6 +1,6 @@
 package extraction
 
-import extraction.Main.{apkFilePath, cordovaFound, flutterFound, logger, qtFound, reactNativeFound, unityFound, xamarinFound}
+import extraction.Main.{_apkFilePath, _cordovaFound, _flutterFound, _logger, _qtFound, _reactNativeFound, _unityFound, _xamarinFound}
 import play.api.libs.json.{JsValue, Json}
 import tools.Constants.{cordovaName, flutterName, qtName, reactNativeName, unityName, xamarinName}
 import tools.VersionComparison.{olderThan, olderThanForUnity}
@@ -13,8 +13,8 @@ class JsonWriter {
 
 
   def writeJsonFile(android: AndroidAPI, frameworks: ExtractFrameworkVersions): Unit = {
-    logger.info("Writing output file")
-    val file = new File(apkFilePath.replaceFirst("[.][^.]+$", "") + ".json")
+    _logger.info("Writing output file")
+    val file = new File(_apkFilePath.replaceFirst("[.][^.]+$", "") + ".json")
     try {
       val bw = new BufferedWriter(new FileWriter(file))
 
@@ -23,39 +23,39 @@ class JsonWriter {
       var print = Json.obj(androidJSON)
 
       var versions: ArrayBuffer[String] = new ArrayBuffer()
-      if (flutterFound) {
-        if (frameworks.frameworkVersions.contains(flutterName)) {
-          versions = frameworks.frameworkVersions(flutterName)
+      if (_flutterFound) {
+        if (frameworks._frameworkVersions.contains(flutterName)) {
+          versions = frameworks._frameworkVersions(flutterName)
         }
         print += createJson(flutterName, versions)
       }
-      if (reactNativeFound) {
-        if (frameworks.frameworkVersions.contains(reactNativeName)) {
-          versions = frameworks.frameworkVersions(reactNativeName)
+      if (_reactNativeFound) {
+        if (frameworks._frameworkVersions.contains(reactNativeName)) {
+          versions = frameworks._frameworkVersions(reactNativeName)
         }
         print += createJson(reactNativeName, versions)
       }
-      if (qtFound) {
-        if (frameworks.frameworkVersions.contains(qtName)) {
-          versions = frameworks.frameworkVersions(qtName)
+      if (_qtFound) {
+        if (frameworks._frameworkVersions.contains(qtName)) {
+          versions = frameworks._frameworkVersions(qtName)
         }
         print += createJson(qtName, versions)
       }
-      if (xamarinFound) {
-        if (frameworks.frameworkVersions.contains(xamarinName)) {
-          versions = frameworks.frameworkVersions(xamarinName)
+      if (_xamarinFound) {
+        if (frameworks._frameworkVersions.contains(xamarinName)) {
+          versions = frameworks._frameworkVersions(xamarinName)
         }
         print += createJson(xamarinName, versions)
       }
-      if (cordovaFound) {
-        if (frameworks.frameworkVersions.contains(cordovaName)) {
-          versions = frameworks.frameworkVersions(cordovaName)
+      if (_cordovaFound) {
+        if (frameworks._frameworkVersions.contains(cordovaName)) {
+          versions = frameworks._frameworkVersions(cordovaName)
         }
         print += createJson(cordovaName, versions)
       }
-      if (unityFound) {
-        if (frameworks.frameworkVersions.contains(unityName)) {
-          versions = frameworks.frameworkVersions(unityName)
+      if (_unityFound) {
+        if (frameworks._frameworkVersions.contains(unityName)) {
+          versions = frameworks._frameworkVersions(unityName)
         }
         print += createJson(unityName, versions)
       }
@@ -65,7 +65,7 @@ class JsonWriter {
       bw.newLine()
       bw.close()
     } catch {
-      case e: IOException => logger.error(e.getMessage)
+      case e: IOException => _logger.error(e.getMessage)
         sys.exit(-1)
     }
   }
@@ -77,10 +77,10 @@ class JsonWriter {
    * @return the mapping of the Android version
    */
   def createAndroidAPIJson(android: AndroidAPI): (String, Json.JsValueWrapper) = {
-    val minSdkVersion = android.minSdkVersion
-    val targetSdkVersion = android.targetSdkVersion
-    val compileSdkVersion = android.compileSdkVersion
-    val withAndroidGeneral = android.withAndroidGeneral
+    val minSdkVersion = android._minSdkVersion
+    val targetSdkVersion = android._targetSdkVersion
+    val compileSdkVersion = android._compileSdkVersion
+    val withAndroidGeneral = android._withAndroidGeneral
 
     val range = targetSdkVersion - minSdkVersion
 
@@ -145,7 +145,7 @@ class JsonWriter {
       }
     } else {
       val msg = s"No $frameworkName version found, perhaps too old or too new?"
-      logger.warn(msg)
+      _logger.warn(msg)
       writeVersion = msg
     }
 

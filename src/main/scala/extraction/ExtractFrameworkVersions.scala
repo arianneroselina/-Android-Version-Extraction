@@ -1,6 +1,6 @@
 package extraction
 
-import com.typesafe.scalalogging.Logger
+import extraction.Main._logger
 import tools.Constants.{cordovaName, reactNativeName, unityName}
 import tools.HexEditor.{openHexFile, toAscii}
 
@@ -10,8 +10,9 @@ import scala.collection.immutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks.{break, breakable}
 
-class ExtractFrameworkVersions {
-  var frameworkVersions: HashMap[String, ArrayBuffer[String]] = HashMap()
+class ExtractFrameworkVersions() {
+  var _frameworkVersions: HashMap[String, ArrayBuffer[String]] = HashMap()
+  var _byDates: HashMap[String, Boolean] = HashMap()
 
   /**
    * Compare the given hash with the one in the generated tables.
@@ -20,9 +21,8 @@ class ExtractFrameworkVersions {
    * @param frameworkName the framework's name
    * @param hash          the file path
    * @param libType       the ABI directory type
-   * @param logger        logger
    */
-  def compareHashes(frameworkName: String, hash: String, libType: String, logger: Logger): Unit = {
+  def compareHashes(frameworkName: String, hash: String, libType: String): Unit = {
     try {
       // check which version the hash belongs to
       val bufferedSource = io.Source.fromFile(
@@ -32,18 +32,19 @@ class ExtractFrameworkVersions {
 
         if (cols(1).equals(hash)) {
           // hashes match
-          if (frameworkVersions.contains(frameworkName)) {
-            if (!frameworkVersions(frameworkName).contains(cols(0))) {
-              frameworkVersions(frameworkName) += cols(0)
+          if (_frameworkVersions.contains(frameworkName)) {
+            if (!_frameworkVersions(frameworkName).contains(cols(0))) {
+              _frameworkVersions(frameworkName) += cols(0)
             }
           } else {
-            frameworkVersions += (frameworkName -> ArrayBuffer(cols(0)))
+            _frameworkVersions += (frameworkName -> ArrayBuffer(cols(0)))
+            _byDates += (frameworkName -> false)
           }
         }
       }
       bufferedSource.close
     } catch {
-      case e: IOException => logger.error(e.getMessage)
+      case e: IOException => _logger.error(e.getMessage)
     }
   }
 
@@ -54,9 +55,8 @@ class ExtractFrameworkVersions {
    * @param hash          the file path
    * @param fileName      the filename
    * @param libType       the ABI directory type
-   * @param logger        logger
    */
-  def compareReactNativeHashes(hash: String, fileName: String, libType: String, logger: Logger): Unit = {
+  def compareReactNativeHashes(hash: String, fileName: String, libType: String): Unit = {
     try {
       // check which version the hash belongs to
       val bufferedSource = io.Source.fromFile(
@@ -66,18 +66,19 @@ class ExtractFrameworkVersions {
 
         if (cols(1).equals(fileName) && cols(2).equals(hash)) {
           // hashes match
-          if (frameworkVersions.contains(reactNativeName)) {
-            if (!frameworkVersions(reactNativeName).contains(cols(0))) {
-              frameworkVersions(reactNativeName) += cols(0)
+          if (_frameworkVersions.contains(reactNativeName)) {
+            if (!_frameworkVersions(reactNativeName).contains(cols(0))) {
+              _frameworkVersions(reactNativeName) += cols(0)
             }
           } else {
-            frameworkVersions += (reactNativeName -> ArrayBuffer(cols(0)))
+            _frameworkVersions += (reactNativeName -> ArrayBuffer(cols(0)))
+            _byDates += (reactNativeName -> false)
           }
         }
       }
       bufferedSource.close
     } catch {
-      case e: IOException => logger.error(e.getMessage)
+      case e: IOException => _logger.error(e.getMessage)
     }
   }
 
@@ -86,7 +87,7 @@ class ExtractFrameworkVersions {
    *
    * @param inputStream the input stream of cordova.js file
    */
-  def extractCordovaVersion(inputStream: InputStream, logger: Logger): Unit = {
+  def extractCordovaVersion(inputStream: InputStream): Unit = {
     try {
       val keyword = "PLATFORM_VERSION_BUILD_LABEL"
 
@@ -98,7 +99,8 @@ class ExtractFrameworkVersions {
             val trimmed = line.replaceAll("\\s", "")
             val index = trimmed.indexOf("=")
             // there is only one cordova.js file
-            frameworkVersions += (cordovaName -> ArrayBuffer(trimmed.substring(index + 2, trimmed.length - 2)))
+            _frameworkVersions += (cordovaName -> ArrayBuffer(trimmed.substring(index + 2, trimmed.length - 2)))
+            _byDates += (cordovaName -> false)
             break
           }
         }
@@ -106,24 +108,35 @@ class ExtractFrameworkVersions {
       reader.close()
       inputStream.close()
     } catch {
-      case _: IndexOutOfBoundsException => logger.error("PLATFORM_VERSION_BUILD_LABEL is not specified in cordova.js")
-      case e: Exception => logger.error(e.getMessage)
+      case _: IndexOutOfBoundsException => _logger.error("PLATFORM_VERSION_BUILD_LABEL is not specified in cordova.js")
+      case e: Exception => _logger.error(e.getMessage)
     }
   }
 
   /**
    * Extract the Unity version from any numbered file found.
    *
-   * @param inputStream the input stream of cordova.js file
+   * @param inputStream the input stream of cordova.js file*
    */
-  def extractUnityVersion(inputStream: InputStream, logger: Logger): Unit = {
+  def extractUnityVersion(inputStream: InputStream): Unit = {
     try {
       val hexString = openHexFile(inputStream)
-      frameworkVersions += (unityName ->
+      _frameworkVersions += (unityName ->
         ArrayBuffer(toAscii(hexString.substring(40, 62)).filter(s => s.isLetterOrDigit || s.equals('.'))))
+      _byDates += (unityName -> false)
       inputStream.close()
     } catch {
-      case e: Exception => logger.error(e.getMessage)
+      case e: Exception => _logger.error(e.getMessage)
     }
+  }
+
+  /**
+   * Extract the framework version by comparing the dates of the app creation and the released framework version.
+   *
+   * @param fileName     the filename
+   * @param creationTime the file's date of creation
+   */
+  def extractFrameworkVersionByDate(fileName: String, creationTime: String): Unit = {
+
   }
 }

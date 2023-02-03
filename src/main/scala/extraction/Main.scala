@@ -13,173 +13,181 @@ import scala.jdk.CollectionConverters.EnumerationHasAsScala
 
 object Main {
 
-  var apkFilePath = ""
-  var apkFilePaths = ""
-  var zipFile: Option[ZipFile] = None
-  val options = new Options()
+  var _apkFilePath = ""
+  var _apkFilePaths = ""
+  var _zipFile: Option[ZipFile] = None
+  val _options = new Options()
 
   // keep track of found frameworks
-  var cordovaFound = false
-  var flutterFound = false
-  var reactNativeFound = false
-  var qtFound = false
-  var unityFound = false
-  var xamarinFound = false
+  var _cordovaFound = false
+  var _flutterFound = false
+  var _reactNativeFound = false
+  var _qtFound = false
+  var _unityFound = false
+  var _xamarinFound = false
 
 
-  options.addOption("f", "apk-filepath", true, "input file <apk file path>")
-  options.addOption("d", "apk-filepaths", true, "path to file containing <apk file paths>")
-  options.addOption("a", "android-general", false, "include general android vulnerability links")
+  _options.addOption("f", "apk-filepath", true, "input file <apk file path>")
+  _options.addOption("d", "apk-filepaths", true, "path to file containing <apk file paths>")
+  _options.addOption("a", "android-general", false, "include general android vulnerability links")
 
-  val logger: Logger = Logger("AndroidVersionExtraction")
+  val _logger: Logger = Logger("AndroidVersionExtraction")
 
   def main(args: Array[String]): Unit = {
     val command = new DefaultParser()
 
     try {
-      val commandline = command.parse(options, args)
+      val commandline = command.parse(_options, args)
 
-      logger.info("Starting android_version_extraction")
+      _logger.info("Starting android_version_extraction")
       val startTime = System.nanoTime
 
       // exactly one of the options must be set
       if (!((commandline.hasOption("f") && !commandline.hasOption("d"))
         || (commandline.hasOption("d") && !commandline.hasOption("f")))) {
-        logger.error("Either filepath or directory must be specified!")
+        _logger.error("Either filepath or directory must be specified!")
         sys.exit(1)
       }
 
       if (commandline.hasOption("f")) {
-        apkFilePath = commandline.getOptionValue("f")
-        androidAppVulnerabilityDetection(Paths.get(apkFilePath), commandline.hasOption("a"))
+        _apkFilePath = commandline.getOptionValue("f")
+        androidAppVulnerabilityDetection(Paths.get(_apkFilePath), commandline.hasOption("a"))
       }
       else if (commandline.hasOption("d")) {
-        apkFilePaths = commandline.getOptionValue("d")
+        _apkFilePaths = commandline.getOptionValue("d")
 
         try {
-          val bufferedSource = io.Source.fromFile(apkFilePaths)
+          val bufferedSource = io.Source.fromFile(_apkFilePaths)
           for (apkFile <- bufferedSource.getLines) {
             androidAppVulnerabilityDetection(Paths.get(apkFile), commandline.hasOption("a"))
           }
           bufferedSource.close
         } catch {
-          case e: IOException => logger.error(e.getMessage)
+          case e: IOException => _logger.error(e.getMessage)
         }
       }
 
-      logger.info("All done")
+      _logger.info("All done")
 
       // benchmark
       val duration = (System.nanoTime - startTime) / 1e9d
-      logger.info("Total Running Time: " + duration)
+      _logger.info("Total Running Time: " + duration)
       val mb = 1024 * 1024
       val runtime = Runtime.getRuntime
-      logger.info("Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb + " mb")
+      _logger.info("Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb + " mb")
       //logger.info("** Free Memory:  " + runtime.freeMemory / mb)
       //logger.info("** Total Memory: " + runtime.totalMemory / mb)
       //logger.info("** Max Memory:   " + runtime.maxMemory / mb)
     } catch {
       case e: Throwable => import org.apache.commons.cli.HelpFormatter
-        logger.error(e.getMessage)
+        _logger.error(e.getMessage)
         val formatter = new HelpFormatter()
-        formatter.printHelp("StringDecryption", options)
+        formatter.printHelp("StringDecryption", _options)
     }
   }
 
   def androidAppVulnerabilityDetection(apkFilePath: Path, withAndroidGeneral: Boolean): Unit = {
     // make sure APK file name is given correctly
     if (!apkFilePath.getFileName.toString.endsWith(".apk")) {
-      logger.error(s"APK file does not have .apk file ending: $apkFilePath")
-      logger.warn("Make sure that filename does not have blank spaces")
+      _logger.error(s"APK file does not have .apk file ending: $apkFilePath")
+      _logger.warn("Make sure that filename does not have blank spaces")
       sys.exit(1)
     }
-    logger.info("Got the .apk file " + apkFilePath)
+    _logger.info("Got the .apk file " + apkFilePath)
 
     // extract the Android version information
-    val android = new AndroidAPI
-    android.extractAndroidAPIVersion(apkFilePath.toString, withAndroidGeneral, logger)
+    val android = new AndroidAPI()
+    android.extractAndroidAPIVersion(apkFilePath.toString, withAndroidGeneral)
 
-    val frameworks = new ExtractFrameworkVersions
+    val frameworks = new ExtractFrameworkVersions()
+    var classDexEntry: ZipEntry = null
 
     // iterate through the zip file and run framework version extraction if a certain file is found
-    zipFile = Some(new ZipFile(apkFilePath.toFile))
-    for (entry <- zipFile.get.entries.asScala) {
+    _zipFile = Some(new ZipFile(apkFilePath.toFile))
+    for (entry <- _zipFile.get.entries.asScala) {
+      if (entry.getName.contains(classDexFile)) {
+        classDexEntry = entry
+      }
 
       if (entry.getName.contains(flutterFile)) {
         // extract the Flutter version information
-        if (!flutterFound) logger.info(s"$flutterName implementation found")
+        if (!_flutterFound) _logger.info(s"$flutterName implementation found")
 
         val hash = hashFile(entry)
         val libType = Paths.get(entry.getName).getParent.getFileName.toString
-        frameworks.compareHashes(flutterName, hash, libType, logger)
+        frameworks.compareHashes(flutterName, hash, libType)
 
-        if (!flutterFound) logger.info(s"$flutterName version extraction finished")
-        flutterFound = true
+        if (!frameworks._frameworkVersions.contains(flutterName)) {
+          frameworks.extractFrameworkVersionByDate(flutterName, classDexEntry.getCreationTime.toString)
+        }
+
+        if (!_flutterFound) _logger.info(s"$flutterName version extraction finished")
+        _flutterFound = true
       }
 
       if (entry.getName.matches(""".*""" + reactNativeFile)) {
         // extract the React Native version information
-        if (!reactNativeFound) logger.info(s"$reactNativeName implementation found")
+        if (!_reactNativeFound) _logger.info(s"$reactNativeName implementation found")
 
         val hash = hashFile(entry)
         val entryName = Paths.get(entry.getName)
         val fileName = entryName.getFileName.toString
         val libType = entryName.getParent.getFileName.toString
-        frameworks.compareReactNativeHashes(hash, fileName, libType, logger)
+        frameworks.compareReactNativeHashes(hash, fileName, libType)
 
-        if (!reactNativeFound) logger.info(s"$reactNativeName version extraction finished")
-        reactNativeFound = true
+        if (!_reactNativeFound) _logger.info(s"$reactNativeName version extraction finished")
+        _reactNativeFound = true
       }
 
       if (entry.getName.matches(""".*""" + qtFile)) {
         // extract the Qt version information
-        if (!qtFound) logger.info(s"$qtName implementation found")
+        if (!_qtFound) _logger.info(s"$qtName implementation found")
 
         val hash = hashFile(entry)
         val libType = Paths.get(entry.getName).getParent.getFileName.toString
-        frameworks.compareHashes(qtName, hash, libType, logger)
+        frameworks.compareHashes(qtName, hash, libType)
 
-        if (!qtFound) logger.info(s"$qtName version extraction finished")
-        qtFound = true
+        if (!_qtFound) _logger.info(s"$qtName version extraction finished")
+        _qtFound = true
       }
 
       if (entry.getName.contains(xamarinSoFile) || entry.getName.contains(xamarinDllFile)) {
         // extract the Xamarin version information
-        if (!xamarinFound) logger.info(s"$xamarinName implementation found")
+        if (!_xamarinFound) _logger.info(s"$xamarinName implementation found")
 
         val hash = hashFile(entry)
         val libType = Paths.get(entry.getName).getParent.getFileName.toString
-        frameworks.compareHashes(xamarinName, hash, libType, logger)
+        frameworks.compareHashes(xamarinName, hash, libType)
 
-        if (!xamarinFound) logger.info(s"$xamarinName version extraction finished")
-        xamarinFound = true
+        if (!_xamarinFound) _logger.info(s"$xamarinName version extraction finished")
+        _xamarinFound = true
       }
 
       if (entry.getName.contains(cordovaFile)) {
         // extract the Cordova version information
-        if (!cordovaFound) logger.info(s"$cordovaName implementation found")
-        frameworks.extractCordovaVersion(zipFile.get.getInputStream(entry), logger)
-        if (!cordovaFound) logger.info(s"$cordovaName version extraction finished")
-        cordovaFound = true
+        if (!_cordovaFound) _logger.info(s"$cordovaName implementation found")
+        frameworks.extractCordovaVersion(_zipFile.get.getInputStream(entry))
+        if (!_cordovaFound) _logger.info(s"$cordovaName version extraction finished")
+        _cordovaFound = true
       }
 
       // extract the Unity version information using the two methods
       if (entry.getName.matches(""".*""" + unityNumberedFile)) {
-        if (!unityFound) logger.info(s"$unityName implementation found")
-        frameworks.extractUnityVersion(zipFile.get.getInputStream(entry), logger)
-        if (!unityFound) logger.info(s"$unityName version extraction finished")
-        unityFound = true
+        if (!_unityFound) _logger.info(s"$unityName implementation found")
+        frameworks.extractUnityVersion(_zipFile.get.getInputStream(entry))
+        if (!_unityFound) _logger.info(s"$unityName version extraction finished")
+        _unityFound = true
       }
 
       if (entry.getName.contains(unitySoFile)) {
-        if (!unityFound) logger.info(s"$unityName implementation found")
+        if (!_unityFound) _logger.info(s"$unityName implementation found")
 
         val hash = hashFile(entry)
         val libType = Paths.get(entry.getName).getParent.getFileName.toString
-        frameworks.compareHashes(unityName, hash, libType, logger)
+        frameworks.compareHashes(unityName, hash, libType)
 
-        if (!unityFound) logger.info(s"$unityName version extraction finished")
-        unityFound = true
+        if (!_unityFound) _logger.info(s"$unityName version extraction finished")
+        _unityFound = true
       }
     }
 
@@ -194,7 +202,7 @@ object Main {
    * @return the hash of the file at the entry
    */
   def hashFile(entry: ZipEntry): String = {
-    val is = zipFile.get.getInputStream(entry)
+    val is = _zipFile.get.getInputStream(entry)
     val hash = bytesToHex(MessageDigest.getInstance("SHA256").digest(is.readAllBytes())).mkString("")
     hash
   }

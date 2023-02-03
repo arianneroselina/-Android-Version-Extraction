@@ -16,4 +16,6 @@ object Constants {
   val unityNumberedFile = """[a-z0-9]{32}"""
   val xamarinSoFile = "libxa-internal-api.so"
   val xamarinDllFile = "Java.Interop.dll"
+
+  val classDexFile = "classes.dex"
 }
