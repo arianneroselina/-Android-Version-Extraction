@@ -149,7 +149,7 @@ class ExtractFrameworkVersions() {
     if (lastModDate == null || lastModDate.equals("")) return
 
     try {
-      // check which version the hash belongs to
+      // the entries in the file are sorted by date in descending order
       val bufferedSource = io.Source.fromFile(
         Paths.get(".").toAbsolutePath + s"/src/files/publish_date/$frameworkName.csv")
 
@@ -160,7 +160,7 @@ class ExtractFrameworkVersions() {
 
           if (dateLaterThan(lastModDate, cols(1))) {
             if (closestDate.isEmpty || closestDate.equals(cols(1))) {
-              // hashes match
+              // date of the add is the closest date but later than the version's published date
               if (_frameworkVersions.contains(frameworkName)) {
                 if (!_frameworkVersions(frameworkName).contains(cols(0))) {
                   _frameworkVersions(frameworkName) += cols(0)
