@@ -5,13 +5,14 @@ This repository is introduced in my Bachelor thesis with the title "Vulnerabilit
 This tool automates the version extraction of an Android application (frameworks and languages used) and use this information
 to determine the security and privacy vulnerabilities of the app.
 
-Android mobile app development frameworks that are supported by this tool:
-1. Flutter
-2. React Native
-3. Qt
-4. Xamarin
-5. Unity
-6. Apache Cordova
+Android mobile application development frameworks supported by this tool, along with the earliest release date can be 
+found in the optimal situation:
+1. Flutter, up to version 1.17.0 (06.05.2020)
+2. React Native, up to version 0.62.0 (26.03.2020)
+3. Qt, up to version 5.14.2 (31.03.2020)
+4. Xamarin, up to version 11.0.0.3 (05.08.2020)
+5. Unity, all versions are covered
+6. Apache Cordova, all versions are covered
 
 ## Usage
 Given an APK file or folder path, this tool creates a JSON file stating the versions and the corresponding vulnerability website links.
