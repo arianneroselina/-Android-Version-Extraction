@@ -45,6 +45,10 @@ frameworkVersions = {
 
 def evaluation_graphs(filepath):
     global androidVersionFound
+    global androidMinSdkVersions
+    global androidTargetSdkVersions
+    global androidCompileSdkVersions
+
     file = open(filepath, 'r')
     lines = file.readlines()
 
@@ -82,6 +86,11 @@ def evaluation_graphs(filepath):
                             increment_dict(frameworkVersions[frameworkKey], v[0])
         jsonFile.close()
     file.close()
+
+    # sort keys
+    androidMinSdkVersions = dict(sorted(androidMinSdkVersions.items()))
+    androidTargetSdkVersions = dict(sorted(androidTargetSdkVersions.items()))
+    androidCompileSdkVersions = dict(sorted(androidCompileSdkVersions.items()))
 
 
 def increment_lists_dict(myDict, key, pos):
