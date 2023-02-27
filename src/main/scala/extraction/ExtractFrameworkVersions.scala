@@ -5,7 +5,7 @@ import tools.Comparison.dateLaterThan
 import tools.Constants.{cordovaName, reactNativeName, unityName}
 import tools.HexEditor.{openHexFile, toAscii}
 
-import java.io.{BufferedReader, IOException, InputStream, InputStreamReader}
+import java.io.{BufferedReader, InputStream, InputStreamReader}
 import java.nio.file.Paths
 import scala.collection.immutable.HashMap
 import scala.collection.mutable.ArrayBuffer
@@ -46,7 +46,7 @@ class ExtractFrameworkVersions() {
       }
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(s"compareHashes() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"compareHashes() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -81,7 +81,7 @@ class ExtractFrameworkVersions() {
       }
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(s"compareReactNativeHashes() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"compareReactNativeHashes() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -115,7 +115,7 @@ class ExtractFrameworkVersions() {
       inputStream.close()
     } catch {
       case _: IndexOutOfBoundsException => _logger.error("PLATFORM_VERSION_BUILD_LABEL is not specified in cordova.js")
-      case e: Exception => _logger.error(s"extractCordovaVersion() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"extractCordovaVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -135,7 +135,7 @@ class ExtractFrameworkVersions() {
       _byDates += (unityName -> false)
       inputStream.close()
     } catch {
-      case e: Exception => _logger.error(s"extractUnityVersion() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"extractUnityVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -181,7 +181,7 @@ class ExtractFrameworkVersions() {
 
       bufferedSource.close
     } catch {
-      case e: IOException => _logger.error(s"byDate() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"byDate() throws an error with message: ${e.getMessage}")
     }
   }
 }

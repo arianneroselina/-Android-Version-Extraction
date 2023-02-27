@@ -6,7 +6,7 @@ import tools.Constants._
 import tools.Comparison.{versionOlderThan, versionOlderThanForUnity}
 import vulnerability.VulnerabilityLinks.{getAndroidVulnerabilities, getFrameworksVulnerabilities, getUnityVulnerabilities}
 
-import java.io.{BufferedWriter, File, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.Path
 import scala.collection.mutable.ArrayBuffer
 
@@ -85,8 +85,7 @@ class JsonWriter {
 
       _logger.info("Finished writing output file")
     } catch {
-      case e: IOException => _logger.error(s"writeJsonFile() throws an error with message: ${e.getMessage}")
-        sys.exit(-1)
+      case e: Throwable => _logger.error(s"writeJsonFile() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -100,25 +99,28 @@ class JsonWriter {
     val minSdkVersion = android._minSdkVersion
     val targetSdkVersion = android._targetSdkVersion
     val compileSdkVersion = android._compileSdkVersion
-
     val range = targetSdkVersion - minSdkVersion
-
     var versions = Json.obj()
-    if (targetSdkVersion != -1 && minSdkVersion == -1) {
-      // only targetSdkVersion found
-      val links = getAndroidVulnerabilities(targetSdkVersion, _withAndroidGeneral)
-      versions = versions + (targetSdkVersion.toString -> Json.toJson(links))
-    } else if (targetSdkVersion == -1 && minSdkVersion != -1) {
-      // only minSdkVersion found
-      val links = getAndroidVulnerabilities(minSdkVersion, _withAndroidGeneral)
-      versions = versions + (minSdkVersion.toString -> Json.toJson(links))
-    } else if (targetSdkVersion != -1 && minSdkVersion != -1) {
-      // both versions found
-      for (i <- 0 to range) {
-        val currentVersion = minSdkVersion + i
-        val links = getAndroidVulnerabilities(currentVersion, _withAndroidGeneral)
-        versions = versions + (currentVersion.toString -> Json.toJson(links))
+
+    try {
+      if (targetSdkVersion != -1 && minSdkVersion == -1) {
+        // only targetSdkVersion found
+        val links = getAndroidVulnerabilities(targetSdkVersion, _withAndroidGeneral)
+        versions = versions + (targetSdkVersion.toString -> Json.toJson(links))
+      } else if (targetSdkVersion == -1 && minSdkVersion != -1) {
+        // only minSdkVersion found
+        val links = getAndroidVulnerabilities(minSdkVersion, _withAndroidGeneral)
+        versions = versions + (minSdkVersion.toString -> Json.toJson(links))
+      } else if (targetSdkVersion != -1 && minSdkVersion != -1) {
+        // both versions found
+        for (i <- 0 to range) {
+          val currentVersion = minSdkVersion + i
+          val links = getAndroidVulnerabilities(currentVersion, _withAndroidGeneral)
+          versions = versions + (currentVersion.toString -> Json.toJson(links))
+        }
       }
+    } catch {
+      case e: Throwable => _logger.error(s"writeJsonFile() throws an error with message: ${e.getMessage}")
     }
 
     "AndroidAPI" -> Json.obj("minSdkVersion" -> minSdkVersion,
@@ -139,39 +141,43 @@ class JsonWriter {
     var versions = Json.obj()
     var writeVersion = ""
 
-    if (frameworkVersions.nonEmpty) {
-      // sort the versions from latest to oldest
-      var sortedVersions: ArrayBuffer[String] = null
-      if (frameworkName.equals(unityName)) {
-        sortedVersions = frameworkVersions.sortWith((x, y) => versionOlderThanForUnity(x, y) == -1)
-      } else {
-        sortedVersions = frameworkVersions.sortWith((x, y) => versionOlderThan(x, y) == -1)
-      }
-
-      // get vulnerability links for each version
-      for (i <- sortedVersions.indices) {
-        if (i == 0) {
-          writeVersion = sortedVersions(i)
-        } else {
-          writeVersion += ", " + sortedVersions(i)
-        }
-
-        var links: Array[String] = null
+    try {
+      if (frameworkVersions.nonEmpty) {
+        // sort the versions from latest to oldest
+        var sortedVersions: ArrayBuffer[String] = null
         if (frameworkName.equals(unityName)) {
-          links = getUnityVulnerabilities(sortedVersions(i))
+          sortedVersions = frameworkVersions.sortWith((x, y) => versionOlderThanForUnity(x, y) == -1)
         } else {
-          links = getFrameworksVulnerabilities(frameworkName, sortedVersions(i))
+          sortedVersions = frameworkVersions.sortWith((x, y) => versionOlderThan(x, y) == -1)
         }
 
-        versions = versions + (sortedVersions(i) -> Json.toJson(links))
-      }
-    } else {
-      val msg = s"No $frameworkName version found, perhaps too old or too new?"
-      _logger.warn(msg)
-      writeVersion = msg
-    }
+        // get vulnerability links for each version
+        for (i <- sortedVersions.indices) {
+          if (i == 0) {
+            writeVersion = sortedVersions(i)
+          } else {
+            writeVersion += ", " + sortedVersions(i)
+          }
 
-    if (byDate) writeVersion += " (found by APK last modified date)"
+          var links: Array[String] = null
+          if (frameworkName.equals(unityName)) {
+            links = getUnityVulnerabilities(sortedVersions(i))
+          } else {
+            links = getFrameworksVulnerabilities(frameworkName, sortedVersions(i))
+          }
+
+          versions = versions + (sortedVersions(i) -> Json.toJson(links))
+        }
+      } else {
+        val msg = s"No $frameworkName version found, perhaps too old or too new?"
+        _logger.warn(msg)
+        writeVersion = msg
+      }
+
+      if (byDate) writeVersion += " (found by APK last modified date)"
+    } catch {
+      case e: Throwable => _logger.error(s"writeJsonFile() throws an error with message: ${e.getMessage}")
+    }
 
     frameworkName -> Json.obj("Version" -> writeVersion, "Vulnerabilities" -> versions)
   }

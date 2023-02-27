@@ -2,7 +2,7 @@ package extraction
 
 import extraction.Main._logger
 
-import java.io.{BufferedReader, IOException, InputStreamReader}
+import java.io.{BufferedReader, InputStreamReader}
 import java.nio.file.{Files, Paths}
 
 import reflect.io._
@@ -29,7 +29,7 @@ class AndroidAPI() {
       val aaptPath = findAaptPath("aapt.exe")
       if (aaptPath == null) {
         _logger.error(s"aapt.exe command not found at path $aaptPath")
-        sys.exit(1)
+        return
       }
 
       // run aapt.exe
@@ -44,7 +44,7 @@ class AndroidAPI() {
       extractSdkVersions(reader)
       _logger.info("Finished Android API version extraction")
     } catch {
-      case e: IOException => _logger.error(s"extractAndroidAPIVersion() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"extractAndroidAPIVersion() throws an error with message: ${e.getMessage}")
     }
   }
 
@@ -120,7 +120,7 @@ class AndroidAPI() {
         }
       }
     } catch {
-      case e: IOException => _logger.error(s"extractSdkVersions() throws an error with message: ${e.getMessage}")
+      case e: Throwable => _logger.error(s"extractSdkVersions() throws an error with message: ${e.getMessage}")
     }
   }
 }

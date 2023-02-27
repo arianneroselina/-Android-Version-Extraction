@@ -1,5 +1,7 @@
 package tools
 
+import extraction.Main._logger
+
 import java.io.InputStream
 import scala.collection.mutable
 
@@ -19,13 +21,18 @@ object HexEditor {
    * @return a string containing the hexadecimal
    */
   def openHexFile(is: InputStream): String = {
-    val length = is.available()
-    val file_bytes = new Array[Byte](length)
+    try {
+      val length = is.available()
+      val file_bytes = new Array[Byte](length)
 
-    var bytes_read = 0
-    do bytes_read = is.read(file_bytes) while (bytes_read != -1)
+      var bytes_read = 0
+      do bytes_read = is.read(file_bytes) while (bytes_read != -1)
 
-    new String(bytesToHex(file_bytes))
+      new String(bytesToHex(file_bytes))
+    } catch {
+      case e: Throwable => _logger.error(s"openHexFile() throws an error with message: ${e.getMessage}")
+                           ""
+    }
   }
 
   /**
@@ -41,12 +48,17 @@ object HexEditor {
     val hexFormat = new Array[Char](bytes.length * 2)
     var i = 0
     var j = 0
-    while (i < bytes.length) {
-      hexFormat(j) = _hexCharacters((bytes(i) & 0xf0) >>> 4)
-      hexFormat(j + 1) = _hexCharacters(bytes(i) & 0x0f)
 
-      i += 1
-      j = i * 2
+    try {
+      while (i < bytes.length) {
+        hexFormat(j) = _hexCharacters((bytes(i) & 0xf0) >>> 4)
+        hexFormat(j + 1) = _hexCharacters(bytes(i) & 0x0f)
+
+        i += 1
+        j = i * 2
+      }
+    } catch {
+      case e: Throwable => _logger.error(s"bytesToHex() throws an error with message: ${e.getMessage}")
     }
     hexFormat
   }
@@ -62,9 +74,14 @@ object HexEditor {
   def toAscii(hex: String): String = {
     require(hex.length % 2 == 0, "Hex must have an even number of characters. You had " + hex.length)
     val sb = new mutable.StringBuilder
-    for (i <- 0 until hex.length by 2) {
-      val str = hex.substring(i, i + 2)
-      sb.append(Integer.parseInt(str, 16).toChar)
+
+    try {
+      for (i <- 0 until hex.length by 2) {
+        val str = hex.substring(i, i + 2)
+        sb.append(Integer.parseInt(str, 16).toChar)
+      }
+    } catch {
+      case e: Throwable => _logger.error(s"toAscii() throws an error with message: ${e.getMessage}")
     }
     sb.toString
   }

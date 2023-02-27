@@ -1,5 +1,7 @@
 package tools
 
+import extraction.Main._logger
+
 object Comparison {
 
   /**
@@ -15,19 +17,24 @@ object Comparison {
     val version1Array = version1.split('.')
     val version2Array = version2.split('.')
 
-    if (version1Array(0).toInt < version2Array(0).toInt) {
-      1
-    } else if (version1Array(0).toInt == version2Array(0).toInt) {
-      if (version1Array(1).toInt < version2Array(1).toInt) {
+    try {
+      if (version1Array(0).toInt < version2Array(0).toInt) {
         1
-      } else if (version1Array(1).toInt == version2Array(1).toInt) {
-        if (version1Array(2).toInt < version2Array(2).toInt) {
+      } else if (version1Array(0).toInt == version2Array(0).toInt) {
+        if (version1Array(1).toInt < version2Array(1).toInt) {
           1
-        } else if (version1Array(2).toInt == version2Array(2).toInt) {
-          0
+        } else if (version1Array(1).toInt == version2Array(1).toInt) {
+          if (version1Array(2).toInt < version2Array(2).toInt) {
+            1
+          } else if (version1Array(2).toInt == version2Array(2).toInt) {
+            0
+          } else -1
         } else -1
       } else -1
-    } else -1
+    } catch {
+      case _: Throwable => _logger.error(s"Comparing $version1 and $version2 failed")
+        -2
+    }
   }
 
   /**
@@ -43,30 +50,35 @@ object Comparison {
     val version1Array = version1.split('.')
     val version2Array = version2.split('.')
 
-    if (version1Array(0) < version2Array(0)) {
-      1
-    } else if (version1Array(0) == version2Array(0)) {
-      if (version1Array(1) < version2Array(1)) {
+    try {
+      if (version1Array(0) < version2Array(0)) {
         1
-      } else if (version1Array(1) == version2Array(1)) {
-        val pattern = "([0-9]+)([A-Za-z]+)([0-9]+)".r
-        val pattern(v1a, a1, v1b) = version1Array(2)
-        val pattern(v2a, a2, v2b) = version2Array(2)
-        if (v1a < v2a) {
+      } else if (version1Array(0) == version2Array(0)) {
+        if (version1Array(1) < version2Array(1)) {
           1
-        } else if (v1a == v2a) {
-          if (a1.compareToIgnoreCase(a2) == -1) {
+        } else if (version1Array(1) == version2Array(1)) {
+          val pattern = "([0-9]+)([A-Za-z]+)([0-9]+)".r
+          val pattern(v1a, a1, v1b) = version1Array(2)
+          val pattern(v2a, a2, v2b) = version2Array(2)
+          if (v1a < v2a) {
             1
-          } else if (a1.compareToIgnoreCase(a2) == 0) {
-            if (v1b < v2b) {
+          } else if (v1a == v2a) {
+            if (a1.compareToIgnoreCase(a2) == -1) {
               1
-            } else if (v1b == v2b) {
-              0
+            } else if (a1.compareToIgnoreCase(a2) == 0) {
+              if (v1b < v2b) {
+                1
+              } else if (v1b == v2b) {
+                0
+              } else -1
             } else -1
           } else -1
         } else -1
       } else -1
-    } else -1
+    } catch {
+      case _: Throwable => _logger.error(s"Comparing $version1 and $version2 failed")
+        -2
+    }
   }
 
   /**
@@ -80,16 +92,21 @@ object Comparison {
     val date1Array = date1.split('.')
     val date2Array = date2.split('.')
 
-    if (date1Array(2).toInt > date2Array(2).toInt) {
-      true
-    } else if (date1Array(2).toInt == date2Array(2).toInt) {
-      if (date1Array(1).toInt > date2Array(1).toInt) {
+    try {
+      if (date1Array(2).toInt > date2Array(2).toInt) {
         true
-      } else if (date1Array(1).toInt == date2Array(1).toInt) {
-        if (date1Array(0).toInt >= date2Array(0).toInt) {
+      } else if (date1Array(2).toInt == date2Array(2).toInt) {
+        if (date1Array(1).toInt > date2Array(1).toInt) {
           true
+        } else if (date1Array(1).toInt == date2Array(1).toInt) {
+          if (date1Array(0).toInt >= date2Array(0).toInt) {
+            true
+          } else false
         } else false
       } else false
-    } else false
+    } catch {
+      case _: Throwable => _logger.error(s"Comparing $date1 and $date2 failed")
+        false
+    }
   }
 }
