@@ -1,7 +1,12 @@
 import json
 import math
+import pickle
 import sys
+from pathlib import Path
+from PyPDF2 import PdfWriter, PdfReader
+
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 flutterKey = 'Flutter'
 reactNativeKey = 'React Native'
@@ -120,25 +125,48 @@ def integer_axis(lst):
         return range(0, 1)
 
 
-def draw_graph():
+def save_graphs(resultFile):
+    p = PdfPages(resultFile)
+
+    fig_nums = plt.get_fignums()
+    figs = [plt.figure(n) for n in fig_nums]
+
+    for fig in figs:
+        fig.savefig(p, format='pdf')
+
+    p.close()
+
+    # delete last page because somehow an empty page is always created
+    infile = PdfReader(resultFile)
+    output = PdfWriter()
+
+    for i in range(0, 11):
+        p = infile.pages[i]
+        output.add_page(p)
+
+    with open(resultFile, 'wb') as f:
+        output.write(f)
+
+
+def draw_graphs():
     # android api
     plt.bar(range(len(androidMinSdkVersions)), list(androidMinSdkVersions.values()), align='center')
     plt.xticks(range(len(androidMinSdkVersions)), list(androidMinSdkVersions.keys()))
     plt.yticks(integer_axis(androidMinSdkVersions.values()))
     plt.title('Found Android API minSdkVersions')
-    plt.show()
+    plt.figure()
 
     plt.bar(range(len(androidTargetSdkVersions)), list(androidTargetSdkVersions.values()), align='center')
     plt.xticks(range(len(androidTargetSdkVersions)), list(androidTargetSdkVersions.keys()))
     plt.yticks(integer_axis(androidTargetSdkVersions.values()))
     plt.title('Found Android API targetSdkVersions')
-    plt.show()
+    plt.figure()
 
     plt.bar(range(len(androidCompileSdkVersions)), list(androidCompileSdkVersions.values()), align='center')
     plt.xticks(range(len(androidCompileSdkVersions)), list(androidCompileSdkVersions.keys()))
     plt.yticks(integer_axis(androidCompileSdkVersions.values()))
     plt.title('Found Android API compileSdkVersions')
-    plt.show()
+    plt.figure()
 
     # frameworks
     frameworkNames = list(frameworkImplementationAndVersionFound.keys())
@@ -149,13 +177,13 @@ def draw_graph():
     plt.xticks(range(len(frameworkImplementationAndVersionFound)), frameworkNames)
     plt.yticks(integer_axis(implementationFound))
     plt.title('Found framework implementations')
-    plt.show()
+    plt.figure()
 
     plt.bar(range(len(frameworkImplementationAndVersionFound)), versionFound, align='center')
     plt.xticks(range(len(frameworkImplementationAndVersionFound)), frameworkNames)
     plt.yticks(integer_axis(versionFound))
     plt.title('Found framework versions')
-    plt.show()
+    plt.figure()
 
     for framework in frameworkVersions:
         frameworkVersion = frameworkVersions[framework]
@@ -163,7 +191,7 @@ def draw_graph():
         plt.xticks(range(len(frameworkVersion)), list(frameworkVersion.keys()))
         plt.yticks(integer_axis(frameworkVersion.values()))
         plt.title("{} versions found".format(framework))
-        plt.show()
+        plt.figure()
 
 
 if __name__ == '__main__':
@@ -173,4 +201,13 @@ if __name__ == '__main__':
                         f'Make sure there are no spaces in the path.')
 
     evaluation_graphs(sys.argv[1])
-    draw_graph()
+    draw_graphs()
+
+    path = Path(sys.argv[1]).parent
+    save_graphs(str(path) + "\evaluationResult.pdf")
+
+    # write pickled data to json (if needed)
+    myDict = pickle.load(open('C:\Bachelorarbeit\Evaluation\myDicts.p', 'rb'))
+    jsonObject = json.dumps(myDict, sort_keys=True, indent=4)
+    with open(str(path) + "\myDicts.json", "w") as outfile:
+        outfile.write(jsonObject)
