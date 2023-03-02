@@ -24,14 +24,14 @@ compileSdkKey = 'compileSdkVersion'
 versionJsonKey = 'Version'
 
 androidVersionFound = 0  # added if one of minSdkVersion, targetSdkVersion, and compileSdkVersion is found
-frameworkImplementationAndVersionFound = {
+frameworkImplementationAndVersionAndByDateFound = {
     # first entry is added if an implementation is found, second is if the version is found
-    flutterKey: [0, 0],
-    reactNativeKey: [0, 0],
-    qtKey: [0, 0],
-    unityKey: [0, 0],
-    cordovaKey: [0, 0],
-    xamarinKey: [0, 0]
+    flutterKey: [0, 0, 0],
+    reactNativeKey: [0, 0, 0],
+    qtKey: [0, 0, 0],
+    unityKey: [0, 0, 0],
+    cordovaKey: [0, 0, 0],
+    xamarinKey: [0, 0, 0]
 }
 
 # dictionaries to store the versions
@@ -81,9 +81,11 @@ def evaluation_graphs(filepath):
             if frameworkKey in data:
                 framework = data[frameworkKey]
                 if framework:
-                    increment_lists_dict(frameworkImplementationAndVersionFound, frameworkKey, 0)
+                    increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 0)
                     if "perhaps too old or too new?" not in framework[versionJsonKey]:
-                        increment_lists_dict(frameworkImplementationAndVersionFound, frameworkKey, 1)
+                        increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 1)
+                        if "found by APK last modified date" in framework[versionJsonKey]:
+                            increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 2)
 
                         versions = framework[versionJsonKey].split(', ')
                         for version in versions:
@@ -140,7 +142,7 @@ def save_graphs(resultFile):
     infile = PdfReader(resultFile)
     output = PdfWriter()
 
-    for i in range(0, 11):
+    for i in range(0, 12):
         p = infile.pages[i]
         output.add_page(p)
 
@@ -169,20 +171,27 @@ def draw_graphs():
     plt.figure()
 
     # frameworks
-    frameworkNames = list(frameworkImplementationAndVersionFound.keys())
-    implementationFound = get_elements(list(frameworkImplementationAndVersionFound.values()), 0)
-    versionFound = get_elements(list(frameworkImplementationAndVersionFound.values()), 1)
+    frameworkNames = list(frameworkImplementationAndVersionAndByDateFound.keys())
+    implementationFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 0)
+    versionFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 1)
+    byDateFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 2)
 
-    plt.bar(range(len(frameworkImplementationAndVersionFound)), implementationFound, align='center')
-    plt.xticks(range(len(frameworkImplementationAndVersionFound)), frameworkNames)
+    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), implementationFound, align='center')
+    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
     plt.yticks(integer_axis(implementationFound))
     plt.title('Found framework implementations')
     plt.figure()
 
-    plt.bar(range(len(frameworkImplementationAndVersionFound)), versionFound, align='center')
-    plt.xticks(range(len(frameworkImplementationAndVersionFound)), frameworkNames)
+    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), versionFound, align='center')
+    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
     plt.yticks(integer_axis(versionFound))
-    plt.title('Found framework versions')
+    plt.title('Found framework versions (total)')
+    plt.figure()
+
+    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), byDateFound, align='center')
+    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
+    plt.yticks(integer_axis(versionFound))
+    plt.title('Found framework versions (by date)')
     plt.figure()
 
     for framework in frameworkVersions:
@@ -200,7 +209,7 @@ def pickle_data(pickleFile, jsonFile):
         pickle.dump([androidMinSdkVersions,
                      androidTargetSdkVersions,
                      androidCompileSdkVersions,
-                     frameworkImplementationAndVersionFound,
+                     frameworkImplementationAndVersionAndByDateFound,
                      frameworkVersions],
                     handle,
                     protocol=pickle.HIGHEST_PROTOCOL)
