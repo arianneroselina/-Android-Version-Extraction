@@ -104,14 +104,20 @@ class AndroidAPI() {
       breakable {
         while (line != null) {
           if (line.contains("SdkVersion(")) {
-            val versionStr = line.split(')')(2).substring(2)
-            val version = Integer.parseInt(versionStr, 16) // convert hex to int
+            // just continue if there is an error while looking for a version
+            try {
+              var versionStr = line.split(')')(2)
+              if (versionStr.startsWith("0x")) {
+                versionStr = versionStr.substring(2, 4) // only take the first two chars after 0x
+              }
+              val version = Integer.parseInt(versionStr, 16) // convert hex to int
 
-            line match {
-              case MinPattern() => _minSdkVersion = version
-              case TargetPattern() => _targetSdkVersion = version
-              case CompilePattern() => _compileSdkVersion = version
-              case _ =>
+              line match {
+                case MinPattern() => _minSdkVersion = version
+                case TargetPattern() => _targetSdkVersion = version
+                case CompilePattern() => _compileSdkVersion = version
+                case _ =>
+              }
             }
           }
 
