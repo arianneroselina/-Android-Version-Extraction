@@ -194,6 +194,25 @@ def draw_graphs():
         plt.figure()
 
 
+def pickle_data(pickleFile, jsonFile):
+    # pickle data to a file
+    with open(pickleFile, 'wb') as handle:
+        pickle.dump([androidMinSdkVersions,
+                     androidTargetSdkVersions,
+                     androidCompileSdkVersions,
+                     frameworkImplementationAndVersionFound,
+                     frameworkVersions],
+                    handle,
+                    protocol=pickle.HIGHEST_PROTOCOL)
+
+    # convert pickled data to json (if needed)
+    myDict = pickle.load(open(pickleFile, 'rb'))
+    jsonObject = json.dumps(myDict, sort_keys=True, indent=4)
+
+    with open(jsonFile, "w") as outfile:
+        outfile.write(jsonObject)
+
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         raise Exception(f'Please specify the path to the file containing the JSON filepaths!'
@@ -204,10 +223,11 @@ if __name__ == '__main__':
     draw_graphs()
 
     path = Path(sys.argv[1]).parent
-    save_graphs(str(path) + "\evaluationResult.pdf")
+    file = Path(sys.argv[1]).stem
 
-    # write pickled data to json (if needed)
-    myDict = pickle.load(open('C:\Bachelorarbeit\Evaluation\myDicts.p', 'rb'))
-    jsonObject = json.dumps(myDict, sort_keys=True, indent=4)
-    with open(str(path) + "\myDicts.json", "w") as outfile:
-        outfile.write(jsonObject)
+    evalFile = str(path) + "\\" + str(file) + "_evaluation.pdf"
+    save_graphs(evalFile)
+
+    pickleFile = str(path) + "\\" + str(file) + "_pickle.p"
+    jsonFile = str(path) + "\\" + str(file) + "_pickle.json"
+    pickle_data(pickleFile, jsonFile)
