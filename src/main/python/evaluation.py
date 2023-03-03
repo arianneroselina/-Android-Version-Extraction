@@ -360,7 +360,7 @@ def pickle_data(pickleFile, jsonFile):
     # pickle data to a file
     try:
         with open(pickleFile, 'wb') as handle:
-            pickle.dump({"Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
     except:
         print(f"Failed to write the data to the pickle file {pickleFile}.")
 
