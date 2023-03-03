@@ -231,10 +231,7 @@ def save_graphs(resultFile):
         print("The function save_graphs() runs with errors.")
 
 
-
-def draw_graphs():
-    plt.rcParams["figure.figsize"] = (15, 5)
-
+def draw_graphs(pngPath):
     # found implementations
     try:
         implementationKeys = [androidKey]
@@ -245,9 +242,11 @@ def draw_graphs():
 
         x = range(len(implementations))
 
+        plt.figure(figsize=(8, 5))
         plt.bar(x, list([totalEntries] * len(implementations)), label='Total apps', color=(0.2, 0.4, 0.6, 0.6))
         bars = plt.bar(x, list(implementations), label='Implementation found')
         plt.xticks(x, list(implementationKeys))
+        plt.margins(x=0)
         plt.yticks(np.arange(0, totalEntries + 1, step=math.ceil(totalEntries / 20)))
         plt.legend()
         plt.tight_layout()
@@ -258,7 +257,7 @@ def draw_graphs():
             plt.text(rect.get_x() + rect.get_width() / 2.0, height,
                      f'{height / totalEntries * 100:.0f}%', ha='center', va='bottom')
 
-        plt.figure()
+        plt.savefig(f"{pngPath}_implementations.png")
     except:
         print("Failed to plot 1 graph for found Android API and frameworks.")
 
@@ -272,8 +271,10 @@ def draw_graphs():
                 else:
                     highest = max(android[a].values())
 
+                plt.figure(figsize=(15, 5))
                 bars = plt.bar(x, list(android[a].values()))
                 plt.xticks(x, list(android[a].keys()))
+                plt.margins(x=0)
                 plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
                 plt.title(f"Found Android API {a}")
 
@@ -283,7 +284,7 @@ def draw_graphs():
                     if height != 0:
                         plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
 
-                plt.figure()
+                plt.savefig(f"{pngPath}_{a}.png")
     except:
         print("Failed to plot 3 graphs for found Android API versions.")
 
@@ -302,11 +303,13 @@ def draw_graphs():
         else:
             highest = max(frameworkImpl)
 
+        plt.figure(figsize=(8, 5))
         plt.bar(x, frameworkImpl, width=0.9, label='Implementation found', color=(0.2, 0.4, 0.6, 0.6))
         barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods', color='green')
         barsDate = plt.bar(x, frameworkDate, width=width, label='Version found by date', color='orange')
         barsNotFound = plt.bar(x + width, frameworkNotFound, width=width, label='Version not found', color='red')
         plt.xticks(range(len(frameworks)), frameworkNames)
+        plt.margins(x=0)
         plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
         plt.legend()
         plt.title('Framework versions')
@@ -326,7 +329,7 @@ def draw_graphs():
                 plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{percent:.0f}%', ha='center', va='bottom')
                 i += 1
 
-        plt.figure()
+        plt.savefig(f"{pngPath}_framework_versions.png")
     except:
         print("Failed to plot 1 graph for frameworks' statistics.")
 
@@ -340,18 +343,39 @@ def draw_graphs():
             else:
                 highest = max(frameworkVersion.values())
 
-            bars = plt.bar(x, list(frameworkVersion.values()), align='center')
+            plt.figure(figsize=(15, 5))
+            plt.bar(x, list(frameworkVersion.values()))
+            a = plt.gca()
             plt.xticks(x, list(frameworkVersion.keys()))
+            plt.margins(x=0)
             plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+
+            # show only nth label in x-axis
+            i = 0
+            for label in a.xaxis.get_ticklabels():
+                if f == unityKey:
+                    if i % 70 != 0:
+                        label.set_visible(False)
+                elif f == reactNativeKey or f == qtKey:
+                    if i % 10 != 0:
+                        label.set_visible(False)
+                elif f == flutterKey:
+                    if i % 3 != 0:
+                        label.set_visible(False)
+                else:
+                    if i % 5 != 0:
+                        label.set_visible(False)
+                i += 1
+
             plt.title("{} versions found".format(f))
 
             # add counts above the bars
-            for rect in bars:
-                height = rect.get_height()
-                if height != 0:
-                    plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
+            # for rect in bars:
+            #     height = rect.get_height()
+            #     if height != 0:
+            #         plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
 
-            plt.figure()
+            plt.savefig(f"{pngPath}_{f}.png")
     except:
         print("Failed to plot 6 graphs for found frameworks' versions.")
 
@@ -388,21 +412,31 @@ def from_json_output(filepath):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise Exception(f'Please specify the path to the file containing the JSON filepaths!'
-                        f'Expected 1 argument, but was {len(sys.argv) - 1}.\n'
-                        f'Make sure there are no spaces in the path.')
+    if len(sys.argv) != 3:
+        raise Exception(f'Please specify the flag and the path to the file containing the JSON filepaths!'
+                        f'Expected 2 argument, but was {len(sys.argv) - 1}.\n'
+                        f'Make sure there are no spaces in the path.\n'
+                        f'Expected: -i $filepath (input from tool) or -o $filepath (input from the output JSON of this '
+                        f'evaluation script).')
 
-    evaluation_graphs(sys.argv[1])
-    # from_json_output(sys.argv[1])
-    draw_graphs()
+    path = Path(sys.argv[2]).parent
+    file = Path(sys.argv[2]).stem
 
-    path = Path(sys.argv[1]).parent
-    file = Path(sys.argv[1]).stem
+    # input from tool
+    if sys.argv[1] == "-i":
+        evaluation_graphs(sys.argv[2])
+        draw_graphs(str(path) + "/" + str(file))
 
-    evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
-    save_graphs(evalFile)
+        evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
+        save_graphs(evalFile)
 
-    pickleFile = str(path) + "/" + str(file) + "_evaluation.p"
-    jsonFile = str(path) + "/" + str(file) + "_evaluation.json"
-    pickle_data(pickleFile, jsonFile)
+        pickleFile = str(path) + "/" + str(file) + "_evaluation.p"
+        jsonFile = str(path) + "/" + str(file) + "_evaluation.json"
+        pickle_data(pickleFile, jsonFile)
+    # input from the output JSON of this evaluation script
+    elif sys.argv[1] == "-o":
+        from_json_output(sys.argv[2])
+        draw_graphs(str(path) + "/" + str(file))
+
+        evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
+        save_graphs(evalFile)
