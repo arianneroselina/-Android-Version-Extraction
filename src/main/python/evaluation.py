@@ -92,62 +92,71 @@ frameworks = {
 def evaluation_graphs(filepath):
     global totalEntries
 
-    file = open(filepath, 'r')
-    lines = file.readlines()
+    try:
+        file = open(filepath, 'r')
+        lines = file.readlines()
 
-    for line in lines:
-        try:
-            jsonFile = open(line.strip(), 'r')
-            data = json.load(jsonFile)
-        except OSError:
-            print("The file {} cannot be opened.".format(line.strip()))
-            continue
+        for line in lines:
+            try:
+                jsonData = open(line.strip(), 'r')
+                data = json.load(jsonData)
+            except:
+                print(f"Failed reading JSON data {line.strip()}.")
+                continue
 
-        # count number of file
-        totalEntries += 1
+            try:
+                # count number of file
+                totalEntries += 1
 
-        # android versions
-        thisAndroidData = data[androidKey]
-        if thisAndroidData[minSdkKey] != -1 or thisAndroidData[targetSdkKey] != -1 \
-                or thisAndroidData[compileSdkKey] != -1:
-            increment_dict(android, implementationFound)
-            if thisAndroidData[minSdkKey] != -1:
-                increment_dict(android[minSdkKey], thisAndroidData[minSdkKey])
-            if thisAndroidData[targetSdkKey] != -1:
-                increment_dict(android[targetSdkKey], thisAndroidData[targetSdkKey])
-            if thisAndroidData[compileSdkKey] != -1:
-                increment_dict(android[compileSdkKey], thisAndroidData[compileSdkKey])
+                # android versions
+                thisAndroidData = data[androidKey]
+                if thisAndroidData[minSdkKey] != -1 or thisAndroidData[targetSdkKey] != -1 \
+                        or thisAndroidData[compileSdkKey] != -1:
+                    increment_dict(android, implementationFound)
+                    if thisAndroidData[minSdkKey] != -1:
+                        increment_dict(android[minSdkKey], thisAndroidData[minSdkKey])
+                    if thisAndroidData[targetSdkKey] != -1:
+                        increment_dict(android[targetSdkKey], thisAndroidData[targetSdkKey])
+                    if thisAndroidData[compileSdkKey] != -1:
+                        increment_dict(android[compileSdkKey], thisAndroidData[compileSdkKey])
 
-        # framework versions
-        for frameworkKey in frameworkKeys:
-            if frameworkKey in data:
-                thisFramework = data[frameworkKey]
-                if thisFramework:
-                    increment_dict(frameworks[frameworkKey], implementationFound)
-                    found = False
+                # framework versions
+                for frameworkKey in frameworkKeys:
+                    if frameworkKey in data:
+                        thisFramework = data[frameworkKey]
+                        if thisFramework:
+                            increment_dict(frameworks[frameworkKey], implementationFound)
+                            found = False
 
-                    if "perhaps too old or too new?" in thisFramework[versionKey]:
-                        increment_dict(frameworks[frameworkKey], versionNotFound)
-                    elif "found by APK last modified date" in thisFramework[versionKey]:
-                        increment_dict(frameworks[frameworkKey], versionFoundByDate)
-                        found = True
-                    else:
-                        increment_dict(frameworks[frameworkKey], versionFoundInitial)
-                        found = True
+                            if "perhaps too old or too new?" in thisFramework[versionKey]:
+                                increment_dict(frameworks[frameworkKey], versionNotFound)
+                            elif "found by APK last modified date" in thisFramework[versionKey]:
+                                increment_dict(frameworks[frameworkKey], versionFoundByDate)
+                                found = True
+                            else:
+                                increment_dict(frameworks[frameworkKey], versionFoundInitial)
+                                found = True
 
-                    if found:
-                        versions = thisFramework[versionKey].split(', ')
-                        for version in versions:
-                            v = version.split(' ')
-                            increment_dict(frameworks[frameworkKey][versionKey], v[0])
+                            if found:
+                                versions = thisFramework[versionKey].split(', ')
+                                for version in versions:
+                                    v = version.split(' ')
+                                    increment_dict(frameworks[frameworkKey][versionKey], v[0])
 
-        jsonFile.close()
-    file.close()
+                jsonData.close()
+            except:
+                print(f"Failed processing the JSON data {line.strip()}.")
+                continue
 
-    # sort keys
-    android[minSdkKey] = dict(sorted(android[minSdkKey].items()))
-    android[targetSdkKey] = dict(sorted(android[targetSdkKey].items()))
-    android[compileSdkKey] = dict(sorted(android[compileSdkKey].items()))
+        file.close()
+
+        # sort keys
+        android[minSdkKey] = dict(sorted(android[minSdkKey].items()))
+        android[targetSdkKey] = dict(sorted(android[targetSdkKey].items()))
+        android[compileSdkKey] = dict(sorted(android[compileSdkKey].items()))
+
+    except:
+        print(f"The file {filepath} cannot be opened.")
 
 
 def increment_dict(myDict, key):
@@ -171,117 +180,155 @@ def integer_axis(lst):
 
 
 def save_graphs(resultFile):
-    p = PdfPages(resultFile)
+    try:
+        p = PdfPages(resultFile)
 
-    fig_nums = plt.get_fignums()
-    figs = [plt.figure(n) for n in fig_nums]
+        fig_nums = plt.get_fignums()
+        figs = [plt.figure(n) for n in fig_nums]
 
-    for fig in figs:
-        fig.savefig(p, format='pdf')
+        for fig in figs:
+            fig.savefig(p, format='pdf')
 
-    p.close()
+        p.close()
 
-    # delete last page because somehow an empty page is always created
-    infile = PdfReader(resultFile)
-    output = PdfWriter()
+        # delete last page because somehow an empty page is always created
+        infile = PdfReader(resultFile)
+        output = PdfWriter()
 
-    for i in range(0, 11):
-        p = infile.pages[i]
-        output.add_page(p)
+        for i in range(0, 11):
+            p = infile.pages[i]
+            output.add_page(p)
 
-    with open(resultFile, 'wb') as f:
-        output.write(f)
+        with open(resultFile, 'wb') as f:
+            output.write(f)
+    except:
+        print("The function save_graphs() runs with errors.")
+
 
 
 def draw_graphs():
-    # android api
-    implementationKeys = [androidKey]
-    implementations = [android[implementationFound]]
-    for f in frameworks:
-        implementationKeys.append(f)
-        implementations.append(frameworks[f][implementationFound])
+    # found implementations
+    try:
+        implementationKeys = [androidKey]
+        implementations = [android[implementationFound]]
+        for f in frameworks:
+            implementationKeys.append(f)
+            implementations.append(frameworks[f][implementationFound])
 
-    x = range(len(implementations))
-    plt.bar(x, list([totalEntries] * len(implementations)), label='Total entries', color=(0.2, 0.4, 0.6, 0.6))
-    bars = plt.bar(x, list(implementations), label='Implementation found')
-    plt.xticks(x, list(implementationKeys))
-    plt.yticks(np.arange(0, totalEntries + 10, step=5))
-    plt.legend()
-    plt.tight_layout()
+        x = range(len(implementations))
 
-    # add percentages above the bars
-    for rect in bars:
-        height = rect.get_height()
-        plt.text(rect.get_x() + rect.get_width() / 2.0, height,
-                 f'{height / totalEntries * 100:.0f}%', ha='center', va='bottom')
-    plt.figure()
+        plt.bar(x, list([totalEntries] * len(implementations)), label='Total apps', color=(0.2, 0.4, 0.6, 0.6))
+        bars = plt.bar(x, list(implementations), label='Implementation found')
+        plt.xticks(x, list(implementationKeys))
+        plt.yticks(np.arange(0, totalEntries + 1, step=math.ceil(totalEntries / 20)))
+        plt.legend()
+        plt.tight_layout()
 
-    for a in android:
-        if a != implementationFound:
-            x = range(len(android[a]))
-            plt.bar(x, list(android[a].values()))
-            plt.xticks(x, list(android[a].keys()))
-            plt.yticks(integer_axis(android[a].values()))
-            plt.title(f"Found Android API {a}")
-            plt.figure()
-
-    # frameworks
-    frameworkNames = list(frameworks.keys())
-    frameworkImpl = get_elements(list(frameworks.values()), implementationFound)
-    frameworkInit = get_elements(list(frameworks.values()), versionFoundInitial)
-    frameworkDate = get_elements(list(frameworks.values()), versionFoundByDate)
-    frameworkNotFound = get_elements(list(frameworks.values()), versionNotFound)
-    width = 0.3
-    x = np.arange(len(frameworks.keys()))
-
-    plt.bar(x, frameworkImpl, width=0.9, label='Implementation found', color=(0.2, 0.4, 0.6, 0.6))
-    barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods', color='green')
-    barsDate = plt.bar(x, frameworkDate, width=width, label='Version found by date', color='orange')
-    barsNotFound = plt.bar(x + width, frameworkNotFound, width=width, label='Version not found', color='red')
-    plt.xticks(range(len(frameworks)), frameworkNames)
-    plt.yticks(np.arange(0, max(frameworkImpl) + 10, step=5))
-    plt.legend()
-    plt.title('Framework versions')
-
-    # add percentages above the bars
-    for bars in [barsInit, barsDate, barsNotFound]:
-        i = 0
+        # add percentages above the bars
         for rect in bars:
             height = rect.get_height()
-            total = frameworkImpl[i]
+            plt.text(rect.get_x() + rect.get_width() / 2.0, height,
+                     f'{height / totalEntries * 100:.0f}%', ha='center', va='bottom')
 
-            if total == 0:
-                percent = 0
-            else:
-                percent = height / frameworkImpl[i] * 100
-
-            plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{percent:.0f}%', ha='center', va='bottom')
-            i += 1
-
-    plt.figure()
-
-    for f in frameworks:
-        frameworkVersion = frameworks[f][versionKey]
-        x = range(len(frameworkVersion))
-
-        plt.bar(x, list(frameworkVersion.values()), align='center')
-        plt.xticks(x, list(frameworkVersion.keys()))
-        plt.yticks(integer_axis(frameworkVersion.values()))
-        plt.title("{} versions found".format(f))
         plt.figure()
+    except:
+        print("Failed to plot 1 graph for found Android API and frameworks.")
+
+    # android api
+    try:
+        for a in android:
+            if a != implementationFound:
+                x = range(len(android[a]))
+                if not android[a].values():
+                    highest = 1
+                else:
+                    highest = max(android[a].values())
+
+                plt.bar(x, list(android[a].values()))
+                plt.xticks(x, list(android[a].keys()))
+                plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+                plt.title(f"Found Android API {a}")
+                plt.figure()
+    except:
+        print("Failed to plot 3 graphs for found Android API versions.")
+
+    # frameworks
+    try:
+        frameworkNames = list(frameworks.keys())
+        frameworkImpl = get_elements(list(frameworks.values()), implementationFound)
+        frameworkInit = get_elements(list(frameworks.values()), versionFoundInitial)
+        frameworkDate = get_elements(list(frameworks.values()), versionFoundByDate)
+        frameworkNotFound = get_elements(list(frameworks.values()), versionNotFound)
+        width = 0.3
+        x = np.arange(len(frameworks.keys()))
+
+        if not frameworkImpl:
+            highest = 1
+        else:
+            highest = max(frameworkImpl)
+
+        plt.bar(x, frameworkImpl, width=0.9, label='Implementation found', color=(0.2, 0.4, 0.6, 0.6))
+        barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods', color='green')
+        barsDate = plt.bar(x, frameworkDate, width=width, label='Version found by date', color='orange')
+        barsNotFound = plt.bar(x + width, frameworkNotFound, width=width, label='Version not found', color='red')
+        plt.xticks(range(len(frameworks)), frameworkNames)
+        plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+        plt.legend()
+        plt.title('Framework versions')
+
+        # add percentages above the bars
+        for bars in [barsInit, barsDate, barsNotFound]:
+            i = 0
+            for rect in bars:
+                height = rect.get_height()
+                total = frameworkImpl[i]
+
+                if total == 0:
+                    percent = 0
+                else:
+                    percent = height / frameworkImpl[i] * 100
+
+                plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{percent:.0f}%', ha='center', va='bottom')
+                i += 1
+
+        plt.figure()
+    except:
+        print("Failed to plot 1 graph for frameworks' statistics.")
+
+    try:
+        for f in frameworks:
+            frameworkVersion = frameworks[f][versionKey]
+            x = range(len(frameworkVersion))
+
+            if not frameworkVersion.values():
+                highest = 1
+            else:
+                highest = max(frameworkVersion.values())
+
+            plt.bar(x, list(frameworkVersion.values()), align='center')
+            plt.xticks(x, list(frameworkVersion.keys()))
+            plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+            plt.title("{} versions found".format(f))
+            plt.figure()
+    except:
+        print("Failed to plot 6 graphs for found frameworks' versions.")
 
 
 def pickle_data(pickleFile, jsonFile):
     # pickle data to a file
-    with open(pickleFile, 'wb') as handle:
-        pickle.dump({"Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    try:
+        with open(pickleFile, 'wb') as handle:
+            pickle.dump({"Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    except:
+        print(f"Failed to write the data to the pickle file {pickleFile}.")
 
-    # convert pickled data to json (if needed)
-    myDict = pickle.load(open(pickleFile, 'rb'))
-    jsonObject = json.dumps(myDict, sort_keys=True, indent=4)
-
-    with open(jsonFile, "w") as outfile:
-        outfile.write(jsonObject)
+    # write data to json
+    try:
+        jsonObject = json.dumps({"Android": android, "Frameworks": frameworks}, sort_keys=True, indent=4)
+        with open(jsonFile, "w") as outfile:
+            outfile.write(jsonObject)
+    except:
+        print(f"Failed to write the data to the JSON file {jsonFile}.")
 
 
 if __name__ == '__main__':
@@ -296,9 +343,9 @@ if __name__ == '__main__':
     path = Path(sys.argv[1]).parent
     file = Path(sys.argv[1]).stem
 
-    evalFile = str(path) + "\\" + str(file) + "_evaluation.pdf"
+    evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
     save_graphs(evalFile)
 
-    pickleFile = str(path) + "\\" + str(file) + "_pickle.p"
-    jsonFile = str(path) + "\\" + str(file) + "_pickle.json"
+    pickleFile = str(path) + "/" + str(file) + "_evaluation.p"
+    jsonFile = str(path) + "/" + str(file) + "_evaluation.json"
     pickle_data(pickleFile, jsonFile)
