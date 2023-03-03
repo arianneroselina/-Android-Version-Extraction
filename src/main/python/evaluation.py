@@ -3,11 +3,14 @@ import math
 import pickle
 import sys
 from pathlib import Path
+
+import numpy as np
 from PyPDF2 import PdfWriter, PdfReader
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+# constants
 flutterKey = 'Flutter'
 reactNativeKey = 'React Native'
 qtKey = 'Qt'
@@ -15,44 +18,79 @@ unityKey = 'Unity'
 cordovaKey = 'Cordova'
 xamarinKey = 'Xamarin'
 
-frameworkJsonKeys = [flutterKey, reactNativeKey, qtKey, unityKey, cordovaKey, xamarinKey]
+frameworkKeys = [flutterKey, reactNativeKey, qtKey, unityKey, cordovaKey, xamarinKey]
 
-androidJsonKey = 'AndroidAPI'
+androidKey = 'AndroidAPI'
 minSdkKey = 'minSdkVersion'
 targetSdkKey = 'targetSdkVersion'
 compileSdkKey = 'compileSdkVersion'
-versionJsonKey = 'Version'
+versionKey = 'Version'
 
-androidVersionFound = 0  # added if one of minSdkVersion, targetSdkVersion, and compileSdkVersion is found
-frameworkImplementationAndVersionAndByDateFound = {
-    # first entry is added if an implementation is found, second is if the version is found
-    flutterKey: [0, 0, 0],
-    reactNativeKey: [0, 0, 0],
-    qtKey: [0, 0, 0],
-    unityKey: [0, 0, 0],
-    cordovaKey: [0, 0, 0],
-    xamarinKey: [0, 0, 0]
+implementationFound = 'Implementation found'
+versionFoundInitial = 'Version found with initial method'
+versionFoundByDate = 'Version found by date'
+versionNotFound = 'Version not found'
+
+totalEntries = 0
+
+# added if one of minSdkVersion, targetSdkVersion, and compileSdkVersion is found
+android = {
+    implementationFound: 0,
+    minSdkKey: {},
+    targetSdkKey: {},
+    compileSdkKey: {},
 }
 
-# dictionaries to store the versions
-androidMinSdkVersions = {}
-androidTargetSdkVersions = {}
-androidCompileSdkVersions = {}
-frameworkVersions = {
-    flutterKey: {},
-    reactNativeKey: {},
-    qtKey: {},
-    unityKey: {},
-    cordovaKey: {},
-    xamarinKey: {}
+# first entry is added if an implementation is found, second is if the version is found, third if the version is found
+# by date
+frameworks = {
+    flutterKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
+    reactNativeKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
+    qtKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
+    unityKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
+    cordovaKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
+    xamarinKey: {
+        implementationFound: 0,
+        versionFoundInitial: 0,
+        versionFoundByDate: 0,
+        versionNotFound: 0,
+        versionKey: {}
+    },
 }
 
 
 def evaluation_graphs(filepath):
-    global androidVersionFound
-    global androidMinSdkVersions
-    global androidTargetSdkVersions
-    global androidCompileSdkVersions
+    global totalEntries
 
     file = open(filepath, 'r')
     lines = file.readlines()
@@ -65,46 +103,51 @@ def evaluation_graphs(filepath):
             print("The file {} cannot be opened.".format(line.strip()))
             continue
 
+        # count number of file
+        totalEntries += 1
+
         # android versions
-        android = data[androidJsonKey]
-        if android[minSdkKey] != -1 or android[targetSdkKey] != -1 or android[compileSdkKey] != -1:
-            androidVersionFound += 1
-            if android[minSdkKey] != -1:
-                increment_dict(androidMinSdkVersions, android[minSdkKey])
-            if android[targetSdkKey] != -1:
-                increment_dict(androidTargetSdkVersions, android[targetSdkKey])
-            if android[compileSdkKey] != -1:
-                increment_dict(androidCompileSdkVersions, android[compileSdkKey])
+        thisAndroidData = data[androidKey]
+        if thisAndroidData[minSdkKey] != -1 or thisAndroidData[targetSdkKey] != -1 \
+                or thisAndroidData[compileSdkKey] != -1:
+            increment_dict(android, implementationFound)
+            if thisAndroidData[minSdkKey] != -1:
+                increment_dict(android[minSdkKey], thisAndroidData[minSdkKey])
+            if thisAndroidData[targetSdkKey] != -1:
+                increment_dict(android[targetSdkKey], thisAndroidData[targetSdkKey])
+            if thisAndroidData[compileSdkKey] != -1:
+                increment_dict(android[compileSdkKey], thisAndroidData[compileSdkKey])
 
         # framework versions
-        for frameworkKey in frameworkJsonKeys:
+        for frameworkKey in frameworkKeys:
             if frameworkKey in data:
-                framework = data[frameworkKey]
-                if framework:
-                    increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 0)
-                    if "perhaps too old or too new?" not in framework[versionJsonKey]:
-                        increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 1)
-                        if "found by APK last modified date" in framework[versionJsonKey]:
-                            increment_lists_dict(frameworkImplementationAndVersionAndByDateFound, frameworkKey, 2)
+                thisFramework = data[frameworkKey]
+                if thisFramework:
+                    increment_dict(frameworks[frameworkKey], implementationFound)
+                    found = False
 
-                        versions = framework[versionJsonKey].split(', ')
+                    if "perhaps too old or too new?" in thisFramework[versionKey]:
+                        increment_dict(frameworks[frameworkKey], versionNotFound)
+                    elif "found by APK last modified date" in thisFramework[versionKey]:
+                        increment_dict(frameworks[frameworkKey], versionFoundByDate)
+                        found = True
+                    else:
+                        increment_dict(frameworks[frameworkKey], versionFoundInitial)
+                        found = True
+
+                    if found:
+                        versions = thisFramework[versionKey].split(', ')
                         for version in versions:
                             v = version.split(' ')
-                            increment_dict(frameworkVersions[frameworkKey], v[0])
+                            increment_dict(frameworks[frameworkKey][versionKey], v[0])
+
         jsonFile.close()
     file.close()
 
     # sort keys
-    androidMinSdkVersions = dict(sorted(androidMinSdkVersions.items()))
-    androidTargetSdkVersions = dict(sorted(androidTargetSdkVersions.items()))
-    androidCompileSdkVersions = dict(sorted(androidCompileSdkVersions.items()))
-
-
-def increment_lists_dict(myDict, key, pos):
-    if not myDict.get(key):
-        myDict[key][pos] = 1
-    else:
-        myDict[key][pos] += 1
+    android[minSdkKey] = dict(sorted(android[minSdkKey].items()))
+    android[targetSdkKey] = dict(sorted(android[targetSdkKey].items()))
+    android[compileSdkKey] = dict(sorted(android[compileSdkKey].items()))
 
 
 def increment_dict(myDict, key):
@@ -122,7 +165,7 @@ def integer_axis(lst):
     if lst:
         minimum = min(lst)
         maximum = max(lst)
-        return range(min(0, math.floor(minimum)), math.ceil(maximum)+1)
+        return range(min(0, math.floor(minimum)), math.ceil(maximum) + 1)
     else:
         return range(0, 1)
 
@@ -142,7 +185,7 @@ def save_graphs(resultFile):
     infile = PdfReader(resultFile)
     output = PdfWriter()
 
-    for i in range(0, 12):
+    for i in range(0, 11):
         p = infile.pages[i]
         output.add_page(p)
 
@@ -152,67 +195,86 @@ def save_graphs(resultFile):
 
 def draw_graphs():
     # android api
-    plt.bar(range(len(androidMinSdkVersions)), list(androidMinSdkVersions.values()), align='center')
-    plt.xticks(range(len(androidMinSdkVersions)), list(androidMinSdkVersions.keys()))
-    plt.yticks(integer_axis(androidMinSdkVersions.values()))
-    plt.title('Found Android API minSdkVersions')
+    implementationKeys = [androidKey]
+    implementations = [android[implementationFound]]
+    for f in frameworks:
+        implementationKeys.append(f)
+        implementations.append(frameworks[f][implementationFound])
+
+    x = range(len(implementations))
+    plt.bar(x, list([totalEntries] * len(implementations)), label='Total entries', color=(0.2, 0.4, 0.6, 0.6))
+    bars = plt.bar(x, list(implementations), label='Implementation found')
+    plt.xticks(x, list(implementationKeys))
+    plt.yticks(np.arange(0, totalEntries + 10, step=5))
+    plt.legend()
+    plt.tight_layout()
+
+    # add percentages above the bars
+    for rect in bars:
+        height = rect.get_height()
+        plt.text(rect.get_x() + rect.get_width() / 2.0, height,
+                 f'{height / totalEntries * 100:.0f}%', ha='center', va='bottom')
     plt.figure()
 
-    plt.bar(range(len(androidTargetSdkVersions)), list(androidTargetSdkVersions.values()), align='center')
-    plt.xticks(range(len(androidTargetSdkVersions)), list(androidTargetSdkVersions.keys()))
-    plt.yticks(integer_axis(androidTargetSdkVersions.values()))
-    plt.title('Found Android API targetSdkVersions')
-    plt.figure()
-
-    plt.bar(range(len(androidCompileSdkVersions)), list(androidCompileSdkVersions.values()), align='center')
-    plt.xticks(range(len(androidCompileSdkVersions)), list(androidCompileSdkVersions.keys()))
-    plt.yticks(integer_axis(androidCompileSdkVersions.values()))
-    plt.title('Found Android API compileSdkVersions')
-    plt.figure()
+    for a in android:
+        if a != implementationFound:
+            x = range(len(android[a]))
+            plt.bar(x, list(android[a].values()))
+            plt.xticks(x, list(android[a].keys()))
+            plt.yticks(integer_axis(android[a].values()))
+            plt.title(f"Found Android API {a}")
+            plt.figure()
 
     # frameworks
-    frameworkNames = list(frameworkImplementationAndVersionAndByDateFound.keys())
-    implementationFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 0)
-    versionFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 1)
-    byDateFound = get_elements(list(frameworkImplementationAndVersionAndByDateFound.values()), 2)
+    frameworkNames = list(frameworks.keys())
+    frameworkImpl = get_elements(list(frameworks.values()), implementationFound)
+    frameworkInit = get_elements(list(frameworks.values()), versionFoundInitial)
+    frameworkDate = get_elements(list(frameworks.values()), versionFoundByDate)
+    frameworkNotFound = get_elements(list(frameworks.values()), versionNotFound)
+    width = 0.3
+    x = np.arange(len(frameworks.keys()))
 
-    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), implementationFound, align='center')
-    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
-    plt.yticks(integer_axis(implementationFound))
-    plt.title('Found framework implementations')
+    plt.bar(x, frameworkImpl, width=0.9, label='Implementation found', color=(0.2, 0.4, 0.6, 0.6))
+    barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods', color='green')
+    barsDate = plt.bar(x, frameworkDate, width=width, label='Version found by date', color='orange')
+    barsNotFound = plt.bar(x + width, frameworkNotFound, width=width, label='Version not found', color='red')
+    plt.xticks(range(len(frameworks)), frameworkNames)
+    plt.yticks(np.arange(0, max(frameworkImpl) + 10, step=5))
+    plt.legend()
+    plt.title('Framework versions')
+
+    # add percentages above the bars
+    for bars in [barsInit, barsDate, barsNotFound]:
+        i = 0
+        for rect in bars:
+            height = rect.get_height()
+            total = frameworkImpl[i]
+
+            if total == 0:
+                percent = 0
+            else:
+                percent = height / frameworkImpl[i] * 100
+
+            plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{percent:.0f}%', ha='center', va='bottom')
+            i += 1
+
     plt.figure()
 
-    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), versionFound, align='center')
-    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
-    plt.yticks(integer_axis(versionFound))
-    plt.title('Found framework versions (total)')
-    plt.figure()
+    for f in frameworks:
+        frameworkVersion = frameworks[f][versionKey]
+        x = range(len(frameworkVersion))
 
-    plt.bar(range(len(frameworkImplementationAndVersionAndByDateFound)), byDateFound, align='center')
-    plt.xticks(range(len(frameworkImplementationAndVersionAndByDateFound)), frameworkNames)
-    plt.yticks(integer_axis(versionFound))
-    plt.title('Found framework versions (by date)')
-    plt.figure()
-
-    for framework in frameworkVersions:
-        frameworkVersion = frameworkVersions[framework]
-        plt.bar(range(len(frameworkVersion)), list(frameworkVersion.values()), align='center')
-        plt.xticks(range(len(frameworkVersion)), list(frameworkVersion.keys()))
+        plt.bar(x, list(frameworkVersion.values()), align='center')
+        plt.xticks(x, list(frameworkVersion.keys()))
         plt.yticks(integer_axis(frameworkVersion.values()))
-        plt.title("{} versions found".format(framework))
+        plt.title("{} versions found".format(f))
         plt.figure()
 
 
 def pickle_data(pickleFile, jsonFile):
     # pickle data to a file
     with open(pickleFile, 'wb') as handle:
-        pickle.dump([androidMinSdkVersions,
-                     androidTargetSdkVersions,
-                     androidCompileSdkVersions,
-                     frameworkImplementationAndVersionAndByDateFound,
-                     frameworkVersions],
-                    handle,
-                    protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump({"Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # convert pickled data to json (if needed)
     myDict = pickle.load(open(pickleFile, 'rb'))
