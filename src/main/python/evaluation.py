@@ -141,7 +141,15 @@ def evaluation_graphs(filepath):
                                 versions = thisFramework[versionKey].split(', ')
                                 for version in versions:
                                     v = version.split(' ')
-                                    increment_dict(frameworks[frameworkKey][versionKey], v[0])
+
+                                    # workarounds for some weird strings in versions
+                                    if frameworkKey == cordovaKey:
+                                        v[0] = fix_cordova_version(v[0])
+                                    if frameworkKey == unityKey:
+                                        v[0] = fix_unity_version(v[0])
+
+                                    if v[0] and v[0] != "":
+                                        increment_dict(frameworks[frameworkKey][versionKey], v[0])
 
                 jsonData.close()
             except:
@@ -179,6 +187,24 @@ def integer_axis(lst):
         return range(0, 1)
 
 
+def fix_cordova_version(version):
+    """Workaround for cordova version, because sometimes it contains weird strings."""
+    result = ""
+    for c in version:
+        if c.isnumeric() or c == '.':
+            result += c
+        else:
+            break
+    return result
+
+
+def fix_unity_version(version):
+    """Workaround for unity version, because sometimes it contains weird strings."""
+    if "." in version and len(version) < 15:
+        return version
+    return ""
+
+
 def save_graphs(resultFile):
     try:
         p = PdfPages(resultFile)
@@ -195,7 +221,7 @@ def save_graphs(resultFile):
         infile = PdfReader(resultFile)
         output = PdfWriter()
 
-        for i in range(0, 11):
+        for i in range(0, len(infile.pages)):
             p = infile.pages[i]
             output.add_page(p)
 
@@ -207,6 +233,8 @@ def save_graphs(resultFile):
 
 
 def draw_graphs():
+    plt.rcParams["figure.figsize"] = (15, 5)
+
     # found implementations
     try:
         implementationKeys = [androidKey]
@@ -244,10 +272,17 @@ def draw_graphs():
                 else:
                     highest = max(android[a].values())
 
-                plt.bar(x, list(android[a].values()))
+                bars = plt.bar(x, list(android[a].values()))
                 plt.xticks(x, list(android[a].keys()))
                 plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
                 plt.title(f"Found Android API {a}")
+
+                # add counts above the bars
+                for rect in bars:
+                    height = rect.get_height()
+                    if height != 0:
+                        plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
+
                 plt.figure()
     except:
         print("Failed to plot 3 graphs for found Android API versions.")
@@ -305,10 +340,17 @@ def draw_graphs():
             else:
                 highest = max(frameworkVersion.values())
 
-            plt.bar(x, list(frameworkVersion.values()), align='center')
+            bars = plt.bar(x, list(frameworkVersion.values()), align='center')
             plt.xticks(x, list(frameworkVersion.keys()))
             plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
             plt.title("{} versions found".format(f))
+
+            # add counts above the bars
+            for rect in bars:
+                height = rect.get_height()
+                if height != 0:
+                    plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
+
             plt.figure()
     except:
         print("Failed to plot 6 graphs for found frameworks' versions.")
@@ -324,11 +366,25 @@ def pickle_data(pickleFile, jsonFile):
 
     # write data to json
     try:
-        jsonObject = json.dumps({"Android": android, "Frameworks": frameworks}, sort_keys=True, indent=4)
+        jsonObject = json.dumps({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, sort_keys=True, indent=4)
         with open(jsonFile, "w") as outfile:
             outfile.write(jsonObject)
     except:
         print(f"Failed to write the data to the JSON file {jsonFile}.")
+
+
+# to draw the graphs if given a previous output JSON file from this evaluation script
+def from_json_output(filepath):
+    global totalEntries
+    global android
+    global frameworks
+
+    jsonData = open(filepath, 'r')
+    data = json.load(jsonData)
+
+    totalEntries = data["Android"][implementationFound]
+    android = data["Android"]
+    frameworks = data["Frameworks"]
 
 
 if __name__ == '__main__':
@@ -338,6 +394,7 @@ if __name__ == '__main__':
                         f'Make sure there are no spaces in the path.')
 
     evaluation_graphs(sys.argv[1])
+    # from_json_output(sys.argv[1])
     draw_graphs()
 
     path = Path(sys.argv[1]).parent
