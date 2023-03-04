@@ -10,7 +10,9 @@ from PyPDF2 import PdfWriter, PdfReader
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-# constants
+################# CONSTANTS #################
+
+
 flutterKey = 'Flutter'
 reactNativeKey = 'React Native'
 qtKey = 'Qt'
@@ -87,6 +89,9 @@ frameworks = {
         versionKey: {}
     },
 }
+
+
+################# GET DATA #################
 
 
 def evaluation_graphs(filepath):
@@ -167,42 +172,69 @@ def evaluation_graphs(filepath):
         print(f"The file {filepath} cannot be opened.")
 
 
-def increment_dict(myDict, key):
-    if not myDict.get(key):
-        myDict[key] = 1
-    else:
-        myDict[key] += 1
+################# SORTING FUNCTIONS #################
 
 
-def get_elements(lst, pos):
-    return [item[pos] for item in lst]
+def sort_unity_framework_versions(x, y):
+    vx = x[0].split('.')
+    vy = y[0].split('.')
+
+    try:
+        for i in range(len(vx)):
+            # version contains letters
+            if vx[i].upper().isupper() or vy[i].upper().isupper():
+                if vx[i] <= vy[i]:
+                    return x, y
+                else:
+                    return y, x
+            if int(vx[i]) < int(vy[i]):
+                return x, y
+            elif int(vx[i]) == int(vy[i]):
+                continue
+            else:
+                print(vy[i], vx[i])
+                return y, x
+        return x, y
+    except:
+        print("Failed sorting framework versions")
 
 
-def integer_axis(lst):
-    if lst:
-        minimum = min(lst)
-        maximum = max(lst)
-        return range(min(0, math.floor(minimum)), math.ceil(maximum) + 1)
-    else:
-        return range(0, 1)
+def sort_other_frameworks_versions(x, y):
+    vx = x[0].split('.')
+    vy = y[0].split('.')
+
+    try:
+        for i in range(len(vx)):
+            a = ''.join(filter(str.isdigit, vx[i]))
+            b = ''.join(filter(str.isdigit, vy[i]))
+            if int(a) < int(b):
+                return x, y
+            elif int(a) == int(b):
+                continue
+            else:
+                return y, x
+        return x, y
+    except:
+        print("Failed sorting framework versions")
 
 
-def fix_cordova_version(version):
-    """Workaround for cordova version, because sometimes it contains weird strings."""
-    result = ""
-    for c in version:
-        if c.isnumeric() or c == '.':
-            result += c
+def bubble(mydict, func):
+    d_items = list(mydict.items())
+    for j in range(len(d_items) - 1):
+        for i in range(len(d_items) - 1):
+            d_items[i], d_items[i + 1] = func(d_items[i], d_items[i + 1])
+    return d_items
+
+
+def sort_framework_versions():
+    for f in frameworks:
+        if f == unityKey:
+            frameworks[f][versionKey] = dict(bubble(frameworks[f][versionKey], sort_unity_framework_versions))
         else:
-            break
-    return result
+            frameworks[f][versionKey] = dict(bubble(frameworks[f][versionKey], sort_other_frameworks_versions))
 
 
-def fix_unity_version(version):
-    """Workaround for unity version, because sometimes it contains weird strings."""
-    if "." in version and len(version) < 15:
-        return version
-    return ""
+################# DRAW AND SAVE GRAPHS #################
 
 
 def save_graphs(resultFile):
@@ -232,6 +264,8 @@ def save_graphs(resultFile):
 
 
 def draw_graphs(pngPath):
+    sort_framework_versions()
+
     # found implementations
     try:
         implementationKeys = [androidKey]
@@ -275,14 +309,15 @@ def draw_graphs(pngPath):
                 bars = plt.bar(x, list(android[a].values()))
                 plt.xticks(x, list(android[a].keys()))
                 plt.margins(x=0)
-                plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+                plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest / 20)))
                 plt.title(f"Found Android API {a}")
 
                 # add counts above the bars
                 for rect in bars:
                     height = rect.get_height()
                     if height != 0:
-                        plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
+                        plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center',
+                                 va='bottom')
 
                 plt.savefig(f"{pngPath}_{a}.png")
     except:
@@ -305,12 +340,13 @@ def draw_graphs(pngPath):
 
         plt.figure(figsize=(8, 5))
         plt.bar(x, frameworkImpl, width=0.9, label='Implementation found', color=(0.2, 0.4, 0.6, 0.6))
-        barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods', color='green')
+        barsInit = plt.bar(x - width, frameworkInit, width=width, label='Version found by initial methods',
+                           color='green')
         barsDate = plt.bar(x, frameworkDate, width=width, label='Version found by date', color='orange')
         barsNotFound = plt.bar(x + width, frameworkNotFound, width=width, label='Version not found', color='red')
         plt.xticks(range(len(frameworks)), frameworkNames)
         plt.margins(x=0)
-        plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+        plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest / 20)))
         plt.legend()
         plt.title('Framework versions')
 
@@ -348,7 +384,7 @@ def draw_graphs(pngPath):
             a = plt.gca()
             plt.xticks(x, list(frameworkVersion.keys()))
             plt.margins(x=0)
-            plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest/20)))
+            plt.yticks(np.arange(0, highest + 1, step=math.ceil(highest / 20)))
 
             # show only nth label in x-axis
             i = 0
@@ -380,21 +416,70 @@ def draw_graphs(pngPath):
         print("Failed to plot 6 graphs for found frameworks' versions.")
 
 
+################# HELPER FUNCTION #################
+
+
+def increment_dict(myDict, key):
+    if not myDict.get(key):
+        myDict[key] = 1
+    else:
+        myDict[key] += 1
+
+
+def get_elements(lst, pos):
+    return [item[pos] for item in lst]
+
+
+def integer_axis(lst):
+    if lst:
+        minimum = min(lst)
+        maximum = max(lst)
+        return range(min(0, math.floor(minimum)), math.ceil(maximum) + 1)
+    else:
+        return range(0, 1)
+
+
+def fix_cordova_version(version):
+    """Workaround for cordova version, because sometimes it contains weird strings."""
+    result = ""
+    for c in version:
+        if c.isnumeric() or c == '.':
+            result += c
+        else:
+            break
+    return result
+
+
+def fix_unity_version(version):
+    """Workaround for unity version, because sometimes it contains weird strings."""
+    if "." in version and len(version) < 15:
+        return version
+    return ""
+
+
+################# OUTPUT PICKLE and JSON DATA #################
+
+
 def pickle_data(pickleFile, jsonFile):
     # pickle data to a file
     try:
         with open(pickleFile, 'wb') as handle:
-            pickle.dump({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, handle,
+                        protocol=pickle.HIGHEST_PROTOCOL)
     except:
         print(f"Failed to write the data to the pickle file {pickleFile}.")
 
     # write data to json
     try:
-        jsonObject = json.dumps({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, sort_keys=True, indent=4)
+        jsonObject = json.dumps({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks},
+                                sort_keys=True, indent=4)
         with open(jsonFile, "w") as outfile:
             outfile.write(jsonObject)
     except:
         print(f"Failed to write the data to the JSON file {jsonFile}.")
+
+
+################# SECOND MAIN FUNCTION #################
 
 
 # to draw the graphs if given a previous output JSON file from this evaluation script
@@ -409,6 +494,9 @@ def from_json_output(filepath):
     totalEntries = data["Android"][implementationFound]
     android = data["Android"]
     frameworks = data["Frameworks"]
+
+
+################# MAIN FUNCTION #################
 
 
 if __name__ == '__main__':
