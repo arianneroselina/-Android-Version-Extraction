@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+from pandas.plotting import table
 from PyPDF2 import PdfWriter, PdfReader
 
 import matplotlib.pyplot as plt
@@ -13,6 +15,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 ################# CONSTANTS #################
 
 
+frameworkKey = 'Frameworks'
 flutterKey = 'Flutter'
 reactNativeKey = 'React Native'
 qtKey = 'Qt'
@@ -27,6 +30,7 @@ minSdkKey = 'minSdkVersion'
 targetSdkKey = 'targetSdkVersion'
 compileSdkKey = 'compileSdkVersion'
 versionKey = 'Version'
+vulnerabilitiesKey = 'Vulnerabilities'
 
 implementationFound = 'Implementation found'
 versionFoundInitial = 'Version found with initial method'
@@ -41,6 +45,7 @@ android = {
     minSdkKey: {},
     targetSdkKey: {},
     compileSdkKey: {},
+    vulnerabilitiesKey: 0
 }
 
 # first entry is added if an implementation is found, second is if the version is found, third if the version is found
@@ -51,42 +56,48 @@ frameworks = {
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
     reactNativeKey: {
         implementationFound: 0,
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
     qtKey: {
         implementationFound: 0,
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
     unityKey: {
         implementationFound: 0,
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
     cordovaKey: {
         implementationFound: 0,
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
     xamarinKey: {
         implementationFound: 0,
         versionFoundInitial: 0,
         versionFoundByDate: 0,
         versionNotFound: 0,
-        versionKey: {}
+        versionKey: {},
+        vulnerabilitiesKey: 0
     },
 }
 
@@ -124,6 +135,8 @@ def evaluation_graphs(filepath):
                         increment_dict(android[targetSdkKey], thisAndroidData[targetSdkKey])
                     if thisAndroidData[compileSdkKey] != -1:
                         increment_dict(android[compileSdkKey], thisAndroidData[compileSdkKey])
+                    for v in thisAndroidData[vulnerabilitiesKey]:
+                        increment_dict_by_n(android, vulnerabilitiesKey, len(thisAndroidData[vulnerabilitiesKey][v]))
 
                 # framework versions
                 for frameworkKey in frameworkKeys:
@@ -156,6 +169,10 @@ def evaluation_graphs(filepath):
                                     if v[0] and v[0] != "":
                                         increment_dict(frameworks[frameworkKey][versionKey], v[0])
 
+                            for v in thisFramework[vulnerabilitiesKey]:
+                                increment_dict_by_n(frameworks[frameworkKey], vulnerabilitiesKey,
+                                                    len(thisFramework[vulnerabilitiesKey][v]))
+
                 jsonData.close()
             except:
                 print(f"Failed processing the JSON data {line.strip()}.")
@@ -167,6 +184,7 @@ def evaluation_graphs(filepath):
         android[minSdkKey] = dict(sorted(android[minSdkKey].items()))
         android[targetSdkKey] = dict(sorted(android[targetSdkKey].items()))
         android[compileSdkKey] = dict(sorted(android[compileSdkKey].items()))
+        sort_framework_versions()
 
     except:
         print(f"The file {filepath} cannot be opened.")
@@ -192,7 +210,6 @@ def sort_unity_framework_versions(x, y):
             elif int(vx[i]) == int(vy[i]):
                 continue
             else:
-                print(vy[i], vx[i])
                 return y, x
         return x, y
     except:
@@ -263,12 +280,10 @@ def save_graphs(resultFile):
         print("The function save_graphs() runs with errors.")
 
 
-def draw_graphs(pngPath):
-    sort_framework_versions()
-
+def draw_graphs(filepath):
     # found implementations
+    implementationKeys = [androidKey]
     try:
-        implementationKeys = [androidKey]
         implementations = [android[implementationFound]]
         for f in frameworks:
             implementationKeys.append(f)
@@ -277,7 +292,7 @@ def draw_graphs(pngPath):
         x = range(len(implementations))
 
         plt.figure(figsize=(8, 5))
-        plt.bar(x, list([totalEntries] * len(implementations)), label='Total apps', color=(0.2, 0.4, 0.6, 0.6))
+        plt.bar(x, list([totalEntries] * len(implementations)), label=f'Total apps = {totalEntries}', color=(0.2, 0.4, 0.6, 0.6))
         bars = plt.bar(x, list(implementations), label='Implementation found')
         plt.xticks(x, list(implementationKeys))
         plt.margins(x=0)
@@ -291,14 +306,14 @@ def draw_graphs(pngPath):
             plt.text(rect.get_x() + rect.get_width() / 2.0, height,
                      f'{height / totalEntries * 100:.0f}%', ha='center', va='bottom')
 
-        plt.savefig(f"{pngPath}_implementations.png")
+        plt.savefig(f"{filepath}_implementations.png")
     except:
         print("Failed to plot 1 graph for found Android API and frameworks.")
 
     # android api
     try:
         for a in android:
-            if a != implementationFound:
+            if a == minSdkKey or a == targetSdkKey or a == compileSdkKey:
                 x = range(len(android[a]))
                 if not android[a].values():
                     highest = 1
@@ -319,7 +334,7 @@ def draw_graphs(pngPath):
                         plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center',
                                  va='bottom')
 
-                plt.savefig(f"{pngPath}_{a}.png")
+                plt.savefig(f"{filepath}_{a}.png")
     except:
         print("Failed to plot 3 graphs for found Android API versions.")
 
@@ -365,7 +380,7 @@ def draw_graphs(pngPath):
                 plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{percent:.0f}%', ha='center', va='bottom')
                 i += 1
 
-        plt.savefig(f"{pngPath}_framework_versions.png")
+        plt.savefig(f"{filepath}_framework_versions.png")
     except:
         print("Failed to plot 1 graph for frameworks' statistics.")
 
@@ -388,32 +403,76 @@ def draw_graphs(pngPath):
 
             # show only nth label in x-axis
             i = 0
-            for label in a.xaxis.get_ticklabels():
-                if f == unityKey:
-                    if i % 70 != 0:
-                        label.set_visible(False)
-                elif f == reactNativeKey or f == qtKey:
-                    if i % 10 != 0:
-                        label.set_visible(False)
-                elif f == flutterKey:
-                    if i % 3 != 0:
-                        label.set_visible(False)
-                else:
-                    if i % 5 != 0:
-                        label.set_visible(False)
-                i += 1
+            if totalEntries > 1000:
+                for label in a.xaxis.get_ticklabels():
+                    if f == unityKey:
+                        if i % 70 != 0:
+                            label.set_visible(False)
+                    elif f == reactNativeKey or f == qtKey:
+                        if i % 10 != 0:
+                            label.set_visible(False)
+                    elif f == flutterKey:
+                        if i % 3 != 0:
+                            label.set_visible(False)
+                    else:
+                        if i % 5 != 0:
+                            label.set_visible(False)
+                    i += 1
 
             plt.title("{} versions found".format(f))
-
-            # add counts above the bars
-            # for rect in bars:
-            #     height = rect.get_height()
-            #     if height != 0:
-            #         plt.text(rect.get_x() + rect.get_width() / 2.0, height, f'{height:.0f}', ha='center', va='bottom')
-
-            plt.savefig(f"{pngPath}_{f}.png")
+            plt.savefig(f"{filepath}_{f}.png")
     except:
         print("Failed to plot 6 graphs for found frameworks' versions.")
+
+    # vulnerabilities
+    try:
+        col1 = '# apps with found versions'
+        col2 = 'Total vulnerabilities'
+        col3 = 'Mean # of vulnerabilities per app'
+
+        aFound = android[implementationFound]
+        aVul = android[vulnerabilitiesKey]
+        if aVul == 0 or aFound == 0:
+            aMean = 0
+        else:
+            aMean = round(aVul / aFound)
+        foundAndVuls = {col1: [aFound], col2: [aVul], col3: [aMean]}
+
+        for f in frameworks:
+            found = frameworks[f][versionFoundInitial] + frameworks[f][versionFoundByDate]
+            vul = frameworks[f][vulnerabilitiesKey]
+
+            foundAndVuls[col1].append(found)
+            foundAndVuls[col2].append(vul)
+            if vul == 0 or found == 0:
+                foundAndVuls[col3].append(0)
+            else:
+                foundAndVuls[col3].append(round(vul / found))
+
+        # generate the table
+        df = pd.DataFrame(foundAndVuls)
+        df.index = implementationKeys
+        pd.set_option("display.max_columns", None)
+        print("Found versions and total # of vulnerabilities:\n", df, "\n")
+        ax = plt.subplot(111, frame_on=False)  # no visible frame
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        table(ax, df, loc='center')
+        plt.title("The number of apps with found framework versions and the total number of the frameworks' "
+                  "vulnerabilities")
+        plt.savefig(f"{filepath}_vulnerability_table.png")
+
+        # generate the pie chart
+        sizes = [foundAndVuls[col3][0], sum(foundAndVuls[col3][1:])]
+        plt.figure(figsize=(15, 5))
+        plt.pie(sizes, labels=[androidKey, frameworkKey], autopct='%1.1f%%')
+        plt.title("The ratio of Android and frameworks' vulnerabilities found in one app")
+        plt.savefig(f"{filepath}_vulnerability_chart.png")
+
+    except:
+        print("Failed to get vulnerability statistics")
+
+    save_graphs(filepath + "_evaluation.pdf")
 
 
 ################# HELPER FUNCTION #################
@@ -424,6 +483,13 @@ def increment_dict(myDict, key):
         myDict[key] = 1
     else:
         myDict[key] += 1
+
+
+def increment_dict_by_n(myDict, key, n):
+    if not myDict.get(key):
+        myDict[key] = n
+    else:
+        myDict[key] += n
 
 
 def get_elements(lst, pos):
@@ -464,14 +530,14 @@ def pickle_data(pickleFile, jsonFile):
     # pickle data to a file
     try:
         with open(pickleFile, 'wb') as handle:
-            pickle.dump({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks}, handle,
+            pickle.dump({"Total apps": totalEntries, androidKey: android, frameworkKey: frameworks}, handle,
                         protocol=pickle.HIGHEST_PROTOCOL)
     except:
         print(f"Failed to write the data to the pickle file {pickleFile}.")
 
     # write data to json
     try:
-        jsonObject = json.dumps({"Total apps:": totalEntries, "Android": android, "Frameworks": frameworks},
+        jsonObject = json.dumps({"Total apps": totalEntries, androidKey: android, frameworkKey: frameworks},
                                 sort_keys=True, indent=4)
         with open(jsonFile, "w") as outfile:
             outfile.write(jsonObject)
@@ -491,9 +557,9 @@ def from_json_output(filepath):
     jsonData = open(filepath, 'r')
     data = json.load(jsonData)
 
-    totalEntries = data["Android"][implementationFound]
-    android = data["Android"]
-    frameworks = data["Frameworks"]
+    totalEntries = data["Total apps"]
+    android = data[androidKey]
+    frameworks = data[frameworkKey]
 
 
 ################# MAIN FUNCTION #################
@@ -513,10 +579,7 @@ if __name__ == '__main__':
     # input from tool
     if sys.argv[1] == "-i":
         evaluation_graphs(sys.argv[2])
-        draw_graphs(str(path) + "/" + str(file))
-
-        evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
-        save_graphs(evalFile)
+        # draw_graphs(str(path) + "/" + str(file))
 
         pickleFile = str(path) + "/" + str(file) + "_evaluation.p"
         jsonFile = str(path) + "/" + str(file) + "_evaluation.json"
@@ -525,6 +588,3 @@ if __name__ == '__main__':
     elif sys.argv[1] == "-o":
         from_json_output(sys.argv[2])
         draw_graphs(str(path) + "/" + str(file))
-
-        evalFile = str(path) + "/" + str(file) + "_evaluation.pdf"
-        save_graphs(evalFile)
